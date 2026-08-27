@@ -443,6 +443,91 @@ def _origin_ok(request: Request) -> bool:
     return (urlparse(ref).hostname or "") in _ALLOWED_HOSTS
 
 
+# ---------------------------------------------------------------- LLM 配置（服务端单一来源）
+# 设置页「接入 AI」写入此文件；复盘 / review chat 统一从它读（见 duanxian/config.py）。
+# 0600 权限 —— 里面有 API key。与 duanxian.config.LLM_CONFIG_PATH 同一位置，
+# 模块级变量方便测试 monkeypatch。
+_LLM_CONFIG_PATH = Path.home() / ".duanxian-agents" / "llm_config.json"
+
+
+def _load_llm_config_file() -> dict | None:
+    """读 llm_config.json；不存在 / 损坏 → None（GET 返回 configured:false）。"""
+    try:
+        cfg = json.loads(_LLM_CONFIG_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(cfg, dict) or not cfg.get("provider"):
+        return None
+    return {
+        "provider": str(cfg.get("provider") or ""),
+        "baseURL": str(cfg.get("baseURL") or ""),
+        "apiKey": str(cfg.get("apiKey") or ""),
+        "model": str(cfg.get("model") or ""),
+    }
+
+
+def _validate_llm_config_payload(body: dict) -> str:
+    """校验 POST body；返回错误文案（"" = 合法，provider 留空 = 清除）。"""
+    if not isinstance(body, dict):
+        return "请求体必须是 JSON 对象"
+    provider = str(body.get("provider") or "").strip()
+    model = str(body.get("model") or "").strip()
+    if not provider:
+        return "" if not model else "provider 必填"
+    if not model:
+        return "model 必填"
+    if provider.startswith("cli-"):
+        return ""  # CLI 订阅：免 baseURL / apiKey
+    if not str(body.get("baseURL") or "").strip():
+        return "API 型需要 baseURL"
+    if not str(body.get("apiKey") or "").strip():
+        return "API 型需要 apiKey"
+    return ""
+
+
+def _save_llm_config_file(body: dict) -> None:
+    """写 llm_config.json（0600，原子替换）；provider 留空 = 清除（删文件）。"""
+    if not str(body.get("provider") or "").strip():
+        try:
+            _LLM_CONFIG_PATH.unlink()
+        except FileNotFoundError:
+            pass
+        return
+    payload = {
+        "provider": str(body.get("provider") or "").strip(),
+        "baseURL": str(body.get("baseURL") or "").strip(),
+        "apiKey": str(body.get("apiKey") or "").strip(),
+        "model": str(body.get("model") or "").strip(),
+    }
+    _LLM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _LLM_CONFIG_PATH.with_name(f"{_LLM_CONFIG_PATH.name}.{uuid.uuid4().hex}.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.chmod(tmp, 0o600)  # key 文件只属主可读写
+    os.replace(tmp, _LLM_CONFIG_PATH)
+
+
+@app.get("/api/llm-config")
+def api_llm_config_get():
+    cfg = _load_llm_config_file()
+    if cfg is None:
+        return {"configured": False}  # 不 404 —— 前端靠这个字段判回显/迁移
+    return {"configured": True, **cfg}
+
+
+@app.post("/api/llm-config")
+def api_llm_config_set(request: Request, body: dict = Body(...)):
+    if not _origin_ok(request):
+        return JSONResponse({"error": "非法来源"}, status_code=403)
+    err = _validate_llm_config_payload(body)
+    if err:
+        return JSONResponse({"detail": err}, status_code=400)
+    _save_llm_config_file(body)
+    return {"ok": True}
+
+
 def _force_flag(request: Request) -> bool:
     """`?force=1` —— 已复盘过还要重跑。只认 POST 上的查询参数（本路由本身是 POST）。"""
     return str(request.query_params.get("force", "")).strip().lower() in ("1", "true", "yes")
@@ -740,7 +825,6 @@ def _weekly(force: bool):
         _wk_lock.release()
 
 
-_chat_llm = None
 _ROLE_MAP = {"user": "human", "assistant": "ai"}
 
 # 对话体量上限。本机其它进程也能打这个口，不设限就能构造超长请求把 LLM 额度烧光。
@@ -771,10 +855,9 @@ def _sanitize_messages(msgs: object) -> tuple[list, Optional[str]]:
 
 
 def _chat_model():
-    global _chat_llm
-    if _chat_llm is None:
-        _chat_llm = make_llm(deep=False)
-    return _chat_llm
+    # **不做进程内缓存**：每次都重新解析（llm_config.json / env 兜底）→
+    # 设置页改配置立即生效，不用重启服务（与 duanxian/config.py 无缓存配套）。
+    return make_llm(deep=False)
 
 
 def _strip_html(s: str) -> str:

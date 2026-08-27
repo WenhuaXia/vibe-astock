@@ -139,7 +139,7 @@ export function useDeepDive(ns: string, date: string): DeepDiveState {
     setNeedConfig(false);
     if (!day) { setOpen(item.key); setAiErr("交易日期尚未就绪，请等待数据加载"); return false; }
     if (expand) setOpen(item.key);
-    if (!hasLlm()) {
+    if (!await hasLlm()) {
       setNeedConfig(true);
       if (!expand) setOpen(item.key); // 批量时也把配置提示亮出来
       return false;
@@ -206,7 +206,7 @@ export function useDeepDive(ns: string, date: string): DeepDiveState {
     if (batchActive.current || running) return;
     const todo = items.filter((it) => !completedRef.current[it.key]);
     if (todo.length === 0) return;
-    if (!hasLlm()) {
+    if (!await hasLlm()) {
       setNeedConfig(true);
       if (todo[0]) setOpen(todo[0].key);
       return;

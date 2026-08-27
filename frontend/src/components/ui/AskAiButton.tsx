@@ -48,7 +48,11 @@ export function AskAiButton({ context, suggestions = [], label = "问 AI · 本�
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (open) setConfigured(hasLlm());
+    if (open) {
+      let alive = true;
+      void hasLlm().then((ok) => { if (alive) setConfigured(ok); });
+      return () => { alive = false; };
+    }
   }, [open]);
 
   useEffect(() => () => abortRef.current?.abort(), []); // 组件卸载兜底

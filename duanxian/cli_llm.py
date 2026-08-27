@@ -93,12 +93,15 @@ def wanted_kind() -> str | None:
     return v or None
 
 
-def make_cli_llm(deep: bool = False) -> CliLlm:
+def make_cli_llm(kind: str | None = None, deep: bool = False) -> CliLlm:
     """构造 CLI 版 LLM。
 
+    `kind` 缺省时取 `VIBE_LLM_CLI` 环境变量（`python main.py` 独立跑的老路径）；
+    设置页「接入 AI」选了 CLI 订阅时由 `config.make_llm` 从 llm_config.json 直接传入。
     CLI 没有 quick / deep 两档模型可选（订阅就是那一个模型），`deep` 只用于日志标注。
     """
-    kind = wanted_kind()
     if not kind:
-        raise RuntimeError(f"{ENV_KIND} 没设置，不该走到这里")
+        kind = wanted_kind()
+        if not kind:
+            raise RuntimeError(f"{ENV_KIND} 没设置，不该走到这里")
     return CliLlm(kind, label=f"{kind}/{'deep' if deep else 'quick'}")
