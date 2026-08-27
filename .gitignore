@@ -30,6 +30,12 @@ vr/.cache/
 # ---- macOS ----
 .DS_Store
 dist-astock/
+<<<<<<< HEAD
 .local/
 # Local build artifacts
 packaging/macos/
+=======
+
+# ---- 项目规划文件（本机工作记忆，不进仓库）----
+.llm-unify/
+>>>>>>> 3b77473 (chore: 规划工作文件移出仓库 / keep planning scratch out of VCS)
