@@ -17,6 +17,10 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
+# ponytail: load .env next to this file, before any duanxian import reads os.environ
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -1697,4 +1701,4 @@ if __name__ == "__main__":
               f" —— 这些 CLI 会不经询问地读写文件、执行命令，"
               f"而问 AI 时抓来的外部新闻原文会原样进 prompt。确认你信任数据源再用。")
     print(f"→ 打开 http://127.0.0.1:{port}  （VR 分栏路由 {_VR_ROUTES} 条已并入）")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
