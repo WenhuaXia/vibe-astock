@@ -48,6 +48,7 @@ _DD_DIR = data_path("deepdive")
 _WK_DIR = data_path("weekly")
 os.makedirs(_REVIEW_DIR, exist_ok=True)
 os.makedirs(_WK_DIR, exist_ok=True)
+os.makedirs(_DD_DIR, exist_ok=True)
 # 允许全部 API 读写的 Host。默认只认本机；挂到域名下访问时，用
 # `VIBE_ALLOW_HOSTS="myhost,www.myhost"`（逗号分隔）把域名加进来，否则全部 API 会 403。
 _ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"} | {
