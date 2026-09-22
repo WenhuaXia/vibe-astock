@@ -176,6 +176,7 @@ export function hasLlm(): Promise<boolean> {
 }
 
 export interface ChatHandlers {
+  sessionId?: string;                          // UI 侧会话分组（后端 /api/chat 不消费，仅前端多轮窗口用）
   onDelta?: (text: string) => void;             // 答案逐块吐字
   onTool?: (tool: string, args: Record<string, unknown>) => void; // AI 调了某数据工具
 }
