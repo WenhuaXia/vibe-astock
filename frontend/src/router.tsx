@@ -16,6 +16,7 @@ import { DailyWatch } from "@/pages/DailyWatch";
 import { Portfolio } from "@/pages/Portfolio";
 import { Watchlist } from "@/pages/Watchlist";
 import { StockData } from "@/pages/StockData";
+import { Triangles } from "@/pages/Triangles";
 import { Intel } from "@/pages/Intel";
 import { Settings } from "@/pages/Settings";
 
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: "/portfolio", element: <Portfolio /> },
       { path: "/watchlist", element: <Watchlist /> },
       { path: "/stock-data", element: <StockData /> },
+      { path: "/triangles", element: <Triangles /> },
       { path: "/intel", element: <Intel /> },
       { path: "/agent/intraday", element: <Intraday /> },
       { path: "/agent/deepdive", element: <DeepDive /> },

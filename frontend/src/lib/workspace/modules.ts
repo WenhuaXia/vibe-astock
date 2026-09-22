@@ -12,7 +12,8 @@ export const MODULES = [
   ] },
   { title: '资讯雷达', to: '/intel', icon: Radio, pages: [{ to: '/intel', title: '资讯雷达' }] },
   { title: '个股研究', to: '/stock-data', icon: LineChart, pages: [
-    { to: '/stock-data', title: '个股研究' }, { to: '/agent/deepdive', title: '多空辩论' },
+    { to: '/stock-data', title: '个股研究' }, { to: '/triangles', title: '收敛三角形' },
+    { to: '/agent/deepdive', title: '多空辩论' },
   ] },
   { title: '回测', to: '/backtest-agent', icon: FlaskConical, pages: [{ to: '/backtest-agent', title: '回测' }] },
   { title: '我的股票', to: '/my-stocks', icon: Briefcase, pages: [
@@ -33,7 +34,7 @@ const CHAT_PAGES: Record<string, string> = {
   '/': '首页', '/intel': '资讯雷达', '/agent/review': '复盘看板',
   '/daily-review': '盘面数据', '/first-board': '首板分析', '/heat': '近5天热度',
   '/backtest': '涨停样本统计', '/watch': '盯盘', '/agent/intraday': '盘中核验',
-  '/stock-data': '个股数据', '/agent/deepdive': '个股深挖',
+  '/stock-data': '个股数据', '/triangles': '收敛三角形', '/agent/deepdive': '个股深挖',
   '/portfolio': '持仓股', '/watchlist': '自选股', '/journal': '交易日志',
   '/settings': '接入 AI', '/my-stocks': '我的股票',
   '/yesterday-ladder': '昨日梯队', '/backtest-agent': '策略回测',

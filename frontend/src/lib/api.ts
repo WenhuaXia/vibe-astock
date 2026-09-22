@@ -215,6 +215,27 @@ export interface TurnoverStock {
 }
 export interface TurnoverTop { stocks: TurnoverStock[]; updated: string; quote_date?: string; reason?: string }
 
+// 收敛三角形扫描（客观形态数据：日线包络通道收敛 + 缩量 + 双侧触边 + 未破位）
+export interface TriangleStock {
+  code: string; name: string;
+  price: number; mcap_yi: number; change_pct: number | null;
+  window: number; shape: "symmetric" | "descending" | "ascending" | "box";
+  status: "forming" | "broke_up" | "broke_down";
+  score: number; conv_ratio: number; right_width_atr: number;
+  top_now: number; bot_now: number; close: number; atr: number;
+  price_pos: number; days_to_apex: number; vol_shrink: number;
+  touch_r: number; touch_s: number; broke: number;
+  strict: boolean; near_break: boolean;
+}
+export interface TriangleData {
+  state: "ready" | "scanning" | "cold" | "error";
+  stale?: boolean;
+  error?: string;
+  updated: string; scanned: number; pool_total: number;
+  hits: number; strict_count: number; near_break_count: number; duration_s: number;
+  stocks: TriangleStock[]; candidates: TriangleStock[]; note: string;
+}
+
 export interface RadarItem {
   title: string; url: string; time: string; source: string; summary?: string; zh?: string;
 }
@@ -369,6 +390,8 @@ export const api = {
     return {...snapshot, watch_warning: monitorWarning || (codes.length > 100 ? '已有自选超过100只，本页仅监控前100只；原列表保留，可在持仓自选中整理' : undefined)};
   },
   firstBoard: () => get<FirstBoardData>("/market/first-board"),
+  triangles: (force = false) => get<TriangleData>(`/market/triangles?force=${force}`),
+  trianglesStatus: () => get<TriangleData>("/market/triangles/status"),
   turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
   globalIndices: () => get<GlobalIndex[]>("/global/indices"),
   globalStock: (symbol: string) => get<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),
