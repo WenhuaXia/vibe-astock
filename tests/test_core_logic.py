@@ -2066,10 +2066,14 @@ class TestOneSourceOfTruthForCliAvailability:
 
     def test_loadllm_uses_server_answer_not_static_table(self):
         """A3：旧选择器已退役，同一保护意图验证统一入口。"""
+        # FIX(t_5e96d2ad) 2026-09-22: 前端回滚到 v1.1.0 产品化（8c8fc7c），llm.ts 是
+        # 「服务端单一来源」版：loadLlm() 读 GET /api/llm-config，CLI 可用性走
+        # serverAllowsCli()（服务端答案），不再是 v1.1.3 的 loadAgentConnection。
+        # 保护意图（CLI 可用性判定只来自服务端、不走静态表）由 serverAllowsCli
+        # + ai-models 的 cliAvailability 缓存继续守住。
         from pathlib import Path
         src=Path("frontend/src/lib/llm.ts").read_text()
-        assert "loadAgentConnection()" in src and "loadLlm()" not in src
-        assert "vr-llm" not in src
+        assert "loadLlm()" in src and "serverAllowsCli" in src
         assert "primeCliAvailability" not in src
 
     def test_stale_notice_also_uses_server_answer(self):
