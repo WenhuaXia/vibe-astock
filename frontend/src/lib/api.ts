@@ -215,25 +215,27 @@ export interface TurnoverStock {
 }
 export interface TurnoverTop { stocks: TurnoverStock[]; updated: string; quote_date?: string; reason?: string }
 
-// 收敛三角形扫描（客观形态数据：日线包络通道收敛 + 缩量 + 双侧触边 + 未破位）
-export interface TriangleStock {
-  code: string; name: string;
-  price: number; mcap_yi: number; change_pct: number | null;
-  window: number; shape: "symmetric" | "descending" | "ascending" | "box";
-  status: "forming" | "broke_up" | "broke_down";
-  score: number; conv_ratio: number; right_width_atr: number;
-  top_now: number; bot_now: number; close: number; atr: number;
-  price_pos: number; days_to_apex: number; vol_shrink: number;
-  touch_r: number; touch_s: number; broke: number;
-  strict: boolean; near_break: boolean;
+// 择时（战法胜率动态）：当前市场阶段 + 各战法月度胜率 K 线序列
+export interface TimingCandle {
+  month: string;
+  open: number; close: number; high: number; low: number; // T10 均收益%(open=上月, close=本月) / 最好 / 最差
+  win: number; n: number; // 胜率 / 样本数
 }
-export interface TriangleData {
-  state: "ready" | "scanning" | "cold" | "error";
-  stale?: boolean;
-  error?: string;
-  updated: string; scanned: number; pool_total: number;
-  hits: number; strict_count: number; near_break_count: number; duration_s: number;
-  stocks: TriangleStock[]; candidates: TriangleStock[]; note: string;
+export interface TimingSignal {
+  date: string; code: string; name: string; t10: number | null; stage: string;
+}
+export interface TimingStrategy {
+  name: string; group: string;
+  candles: TimingCandle[];
+  baseline: { win: number; avg: number } | null;
+  stage_win: Record<string, number | null>;
+  recent: TimingSignal[];
+}
+export interface TimingData {
+  generated_at: string;
+  regime: { current: string; stage: string; gap3m: number | null; vol_chg3m: number | null; breadth3m: number | null };
+  stages: string[];
+  strategies: Record<string, TimingStrategy>;
 }
 
 export interface RadarItem {
@@ -390,8 +392,7 @@ export const api = {
     return {...snapshot, watch_warning: monitorWarning || (codes.length > 100 ? '已有自选超过100只，本页仅监控前100只；原列表保留，可在持仓自选中整理' : undefined)};
   },
   firstBoard: () => get<FirstBoardData>("/market/first-board"),
-  triangles: (force = false) => get<TriangleData>(`/market/triangles?force=${force}`),
-  trianglesStatus: () => get<TriangleData>("/market/triangles/status"),
+  timing: () => get<TimingData>("/market/timing"),
   turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
   globalIndices: () => get<GlobalIndex[]>("/global/indices"),
   globalStock: (symbol: string) => get<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),

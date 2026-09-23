@@ -26,7 +26,7 @@ import portfolio as pf
 import market
 import myreports as mr
 import firstboard
-import triangle
+import timing
 import watchtower
 
 from product_version import PRODUCT_NAME, PRODUCT_VERSION
@@ -318,26 +318,20 @@ def market_first_board():
         raise HTTPException(502, f"首板数据异常：{e}") from e
 
 
-@app.get("/api/market/triangles")
-def market_triangles(force: bool = Query(False)):
-    """收敛三角形全市场扫描入口：立即返回缓存/状态，扫描在后台进行（3~5 分钟）。
+@app.get("/api/market/timing")
+def market_timing():
+    """择时总览：当前市场阶段 + 11 个战法各自的胜率 K 线序列（月度）+ 阶段适配胜率 + 近期信号。
 
-    日线包络通道收敛 + 缩量 + 双侧触边 + 未破位（客观形态数据）。
-    force=true 强制重扫（缓存过期或无缓存时生效）。非推荐、非预测，最终确认需人工看图。
+    数据为离线预生成（~/.hermes/data/style_compass/timing_data.json，周一 cron 刷新），
+    后端零在线依赖。K 线语义：open=上月 T10 均收益, close=本月 T10 均收益,
+    high/low=本月最好/最差单信号, win=本月 T10 胜率, n=样本数。
     """
     try:
-        return {"data": triangle.get_triangles(force=force)}
+        return {"data": timing.load_timing()}
+    except FileNotFoundError as e:
+        raise HTTPException(503, str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"三角形扫描异常：{e}") from e
-
-
-@app.get("/api/market/triangles/status")
-def market_triangles_status():
-    """前端轮询：state=ready 时附完整数据。"""
-    try:
-        return {"data": triangle.status()}
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"三角形状态异常：{e}") from e
+        raise HTTPException(502, f"择时数据异常：{e}") from e
 
 
 @app.get("/api/market/turnover-top")
