@@ -11,9 +11,10 @@ interface Props {
   height?: number;
   granularity?: "month" | "day";
   showVolume?: boolean; // 底部叠加样本数
+  inProgress?: boolean; // 最后一根周期未走完(当月/当日信号不全) → 半透明+"进行中"
 }
 
-export function WinRateCandles({ candles, height = 300, granularity = "month", showVolume = true }: Props) {
+export function WinRateCandles({ candles, height = 300, granularity = "month", showVolume = true, inProgress = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
 
@@ -23,7 +24,15 @@ export function WinRateCandles({ candles, height = 300, granularity = "month", s
     chartRef.current = chart;
     const isDay = granularity === "day";
     const months = candles.map(c => c.month);
-    const kdata = candles.map(c => [c.open, c.close, c.low, c.high]);
+    const lastIdx = candles.length - 1;
+    // 进行中: 最后一根半透明灰色(K线未走完, 信号不全), tooltip 标注
+    const kdata = candles.map((c, i) => {
+      const base = [c.open, c.close, c.low, c.high];
+      if (inProgress && i === lastIdx) {
+        return { value: base, itemStyle: { opacity: 0.5, color: "#9aa0ab", color0: "#9aa0ab", borderColor: "#9aa0ab", borderColor0: "#9aa0ab" } };
+      }
+      return base;
+    });
     const vols = candles.map(c => c.n);
     const meta = candles;
     const periodLabel = isDay ? "当日" : "本月";
@@ -46,11 +55,14 @@ export function WinRateCandles({ candles, height = 300, granularity = "month", s
           const d = m.close - m.open;
           const col = d >= 0 ? "text-red-500" : "text-green-500";
           const sign = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+          const inProg = inProgress && k.dataIndex === candles.length - 1
+            ? `<div style="color:#9aa0ab">⏳ 进行中，本周期未结算（信号不全）</div>` : "";
           return `<div style="font-size:12px;line-height:1.7">
             <b>${m.month}</b>
             <div>${periodLabel}均收益 <b class="${col}">${m.close >= 0 ? "+" : ""}${m.close.toFixed(2)}%</b>（${prevLabel} ${m.open >= 0 ? "+" : ""}${m.open.toFixed(2)}%）</div>
             <div>当期最好 <span class="text-red-500">${sign(m.high)}</span> · 最差 <span class="text-green-500">${sign(m.low)}</span></div>
             <div>胜率 <b>${(m.win * 100).toFixed(0)}%</b> · 覆盖信号 ${m.n} 个</div>
+            ${inProg}
           </div>`;
         },
       },
@@ -88,7 +100,7 @@ export function WinRateCandles({ candles, height = 300, granularity = "month", s
     const onResize = () => chart.resize();
     window.addEventListener("resize", onResize);
     return () => { window.removeEventListener("resize", onResize); chart.dispose(); chartRef.current = null; };
-  }, [candles, height, granularity, showVolume]);
+  }, [candles, height, granularity, showVolume, inProgress]);
 
   return <div ref={ref} style={{ width: "100%", height }} />;
 }

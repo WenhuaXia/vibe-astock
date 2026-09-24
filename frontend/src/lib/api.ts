@@ -216,6 +216,8 @@ export interface TurnoverStock {
 export interface TurnoverTop { stocks: TurnoverStock[]; updated: string; quote_date?: string; reason?: string }
 
 // 择时（战法胜率动态）：当前市场阶段 + 各战法胜率 K 线序列（月线/日线双粒度，含/剔688双口径）
+// v3: 收益均为税前口径; stage_stats 带样本量; 三档衰减/持有期曲线; 信号行带结算状态
+export interface TimingStat { win: number; avg: number; n: number; avg_net?: number }
 export interface TimingCandle {
   month: string; // 月线=YYYY-MM, 日线=YYYY-MM-DD
   open: number; close: number; high: number; low: number; // 均收益%(open=上一期, close=本期) / 最好 / 最差
@@ -225,21 +227,38 @@ export interface TimingSignal {
   date: string; code: string; name: string;
   close0: number | null; price_now: number | null; ret_now: number | null; // 信号日价 / 现价 / 至今收益
   turnover: number | null; zt_1m: boolean; is_688: boolean; stage: string; // 换手率(%) / 近月涨停 / 是否688 / 阶段
+  settled: boolean; hold_days: number | null; t10: number | null; // T10是否结算 / 已持交易日数 / T10税后收益
+  is_bj: boolean; is_st: boolean; // 北交所 / ST
+}
+export interface TimingRecRow {
+  sig: string; name: string; group: string;
+  stage_win: number | null; stage_n: number | null;      // 当前阶段胜率/样本
+  settled3_win: number | null; settled3_n: number | null; // 近3月已结算胜率/样本
+  opp3: number; n_recent: number;
+  score: number | null;
+  light: "prefer" | "watch" | "avoid" | "insufficient";  // 优先/观望/禁用/样本不足
 }
 export interface TimingStrategy {
   name: string; group: string;
   candles_m: TimingCandle[]; candles_m_ex688: TimingCandle[];   // 月度
   candles_d: TimingCandle[]; candles_d_ex688: TimingCandle[];   // 日线(近12月)
-  baseline: { win: number; avg: number } | null;
-  stage_win: Record<string, number | null>;
+  baseline: TimingStat | null;                                    // 十年 T10 (税前, 税后见 avg_net)
+  stage_win: Record<string, number | null>;                        // 兼容: 纯胜率
+  stage_stats: Record<string, TimingStat | null>;                  // 阶段 {win,avg,n,avg_net}
+  decay: Record<"y10" | "y3" | "y1", TimingStat | null>;           // 三档衰减
+  hold_curve: Record<"T5" | "T10" | "T20", TimingStat | null>;     // 持有期衰减
   month: string;
   recent: TimingSignal[]; // 本月全量信号
 }
 export interface TimingData {
   generated_at: string;
-  regime: { current: string; stage: string; gap3m: number | null; vol_chg3m: number | null; breadth3m: number | null };
+  regime: { current: string; stage: string; gap3m: number | null; vol_chg3m: number | null; breadth3m: number | null;
+            months_in: number; prev_stage: string | null; provisional: boolean };
   stages: string[];
   daily_range: [string, string];
+  cost: { round_trip: number; note: string };
+  recommendation: { rows: TimingRecRow[]; top: string[]; all_below_half: boolean };
+  survivorship: { kline_codes: number; delisted_in_warehouse: number; note: string };
   strategies: Record<string, TimingStrategy>;
 }
 

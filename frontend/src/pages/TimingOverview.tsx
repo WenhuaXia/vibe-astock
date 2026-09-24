@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, AlertCircle, Clock, ChevronRight, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, Clock, ChevronRight, RefreshCw, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { WinRateCandles } from "@/components/ui/WinRateCandles";
-import { api, type TimingData, type TimingStrategy } from "@/lib/api";
+import { api, type TimingData, type TimingStrategy, type TimingRecRow } from "@/lib/api";
 import { TIMING_STRATEGIES } from "@/lib/workspace/modules";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,82 @@ export function StageBadge({ stage }: { stage: string }) {
     <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[stage] ?? "bg-zinc-500/10 text-zinc-400"}`}>
       <Clock className="h-3 w-3" /> {stage}
     </span>
+  );
+}
+
+// 本月推荐排序表: 当前阶段胜率 × 近3月已结算, 直接给"下周一用什么"的结论
+const LIGHT_META: Record<TimingRecRow["light"], { label: string; cls: string }> = {
+  prefer: { label: "优先", cls: "bg-emerald-500/15 text-emerald-400" },
+  watch: { label: "观望", cls: "bg-zinc-500/20 text-zinc-300" },
+  avoid: { label: "禁用", cls: "bg-red-500/15 text-red-400" },
+  insufficient: { label: "样本不足", cls: "bg-zinc-500/10 text-zinc-500" },
+};
+
+function RecTable({ data }: { data: TimingData }) {
+  const rec = data.recommendation;
+  const rows = rec.rows;
+  return (
+    <GlassCard className="mb-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <TrendingUp className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">本月推荐 · {data.regime.stage}阶段战法排序</span>
+        <Caliber text={
+          "按【当前阶段胜率】(十年该阶段全部信号) ×【近3月已结算胜率】综合打分, 当前阶段胜率权重1、近3月权重0.5。\n" +
+          "灯号: 优先=当前阶段≥50%且近3月已结算≥50%; 禁用=当前阶段<45%; 观望=中间; 样本不足=当前阶段或近3月样本<5个。\n" +
+          "去重机会=近3月该战法覆盖的不同个股数(同一只票多信号计1次)。\n" +
+          "胜率均为税前口径(往返成本约0.2%见页面底部)。"
+        } />
+        {rec.all_below_half && (
+          <span className="rounded-md bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-400">
+            当前阶段全部战法胜率 &lt;50% → 建议降仓/空仓
+          </span>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="py-1.5 pr-2">战法</th>
+              <th className="py-1.5 pr-2 text-right">当前阶段胜率</th>
+              <th className="py-1.5 pr-2 text-right">近3月已结算</th>
+              <th className="py-1.5 pr-2 text-right">去重机会(近3月)</th>
+              <th className="py-1.5 pr-2 text-right">本月信号</th>
+              <th className="py-1.5 text-right">结论</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const light = LIGHT_META[r.light];
+              return (
+                <tr key={r.sig} className="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                  <td className="py-1.5 pr-2">
+                    <Link to={`/timing/${r.sig}`} className="text-xs font-medium hover:text-primary hover:underline">{r.name}</Link>
+                    <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{r.group}</span>
+                  </td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-xs">
+                    {r.stage_win == null ? <span className="text-muted-foreground/50">—</span> : (
+                      <span className={r.stage_win >= 0.5 ? "text-red-400" : r.stage_win < 0.45 ? "text-green-400" : ""}>
+                        {(r.stage_win * 100).toFixed(1)}%
+                      </span>
+                    )}
+                    <span className="ml-1 text-[10px] text-muted-foreground/60">n={r.stage_n ?? 0}</span>
+                  </td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-xs">
+                    {r.settled3_win == null ? <span className="text-muted-foreground/50">—</span> :
+                      <span>{(r.settled3_win * 100).toFixed(0)}% <span className="text-[10px] text-muted-foreground/60">n={r.settled3_n}</span></span>}
+                  </td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-xs text-muted-foreground">{r.opp3.toLocaleString()}</td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-xs text-muted-foreground">{r.n_recent.toLocaleString()}</td>
+                  <td className="py-1.5 text-right">
+                    <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${light.cls}`}>{light.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -84,7 +160,12 @@ export function TimingControls({
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">当前阶段</span>
         {data ? <StageBadge stage={data.regime.stage} /> : <span className="text-xs text-muted-foreground">—</span>}
-        {data && <span className="font-mono text-xs text-muted-foreground">截至 {data.regime.current}</span>}
+        {data && (
+          <span className="font-mono text-xs text-muted-foreground">
+            第{data.regime.months_in}个月{data.regime.prev_stage ? `（上月：${data.regime.prev_stage}）` : ""}
+            {data.regime.provisional && <span className="ml-1 rounded bg-amber-500/15 px-1 py-0.5 text-[10px] font-medium text-amber-400">月中初判</span>}
+          </span>
+        )}
       </div>
       {data?.regime.gap3m != null && <span className="text-xs text-muted-foreground">吸血度3月 <b className={data.regime.gap3m > 0 ? "text-red-400" : "text-emerald-400"}>{(data.regime.gap3m * 100).toFixed(1)}%</b></span>}
       {data?.regime.vol_chg3m != null && <span className="text-xs text-muted-foreground">量能3月 <b>{(data.regime.vol_chg3m * 100).toFixed(1)}%</b></span>}
@@ -171,16 +252,20 @@ export function TimingOverview() {
     <div>
       <PageHeader
         title="择时 · 战法胜率总览"
-        subtitle="每个战法一条胜率 K 线（月线/日线可切）· 点击进单战法看阶段适配与本月信号池"
+        subtitle="本月推荐 → 每个战法一条胜率 K 线（月线/日线可切）· 点击进单战法看阶段适配与本月信号池"
         actions={<Caliber text={
           "K线语义: 一根K线=该周期内全部持仓中信号的累计收益聚合。\n" +
           "月线: 开盘=上月T10均收益 收盘=本月 上影=当月最好单信号 下影=最差, 底部柱=信号数。\n" +
           "日线: 开盘=前日均收益 收盘=当日 上/下影=当日最好/最差单信号, 柱=覆盖信号数(该日处于10日持仓窗口内的信号)。\n" +
+          "最后一根K线灰色半透明=该周期未走完(信号不全), 仅供参考。\n" +
+          "成本口径: 全部胜率/收益为【税前】; 税后=税前-往返约0.2%(佣金万2.5双边+印花税0.05%卖出+滑点0.1%), 单战法页可切换。\n" +
+          "幸存者偏差: K线仓库含3只退市股(000004/002731/301139, 占0.06%), 胜率口径已含, 影响可忽略(2026-09-24审计)。\n" +
           "剔除688: 统计与信号池同时排除科创板(流动性差)。\n" +
           "红涨绿跌(A股)。数据=十年本地仓库回测, 自动刷新: K线每日16:35 / 战法周一9:00, 也可右上角手动刷新。"
         } />}
       />
 
+      {data && <RecTable data={data} />}
       <TimingControls granularity={granularity} setGranularity={setGranularity} ex688={ex688} setEx688={setEx688} data={data} setData={setData} />
 
       {loading && (
