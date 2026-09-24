@@ -334,6 +334,18 @@ def market_timing():
         raise HTTPException(502, f"择时数据异常：{e}") from e
 
 
+@app.post("/api/market/timing/refresh")
+def market_timing_refresh():
+    """手动触发择时数据刷新：后台跑完整离线数据链（约 6-10 分钟），立即返回状态。"""
+    return {"data": timing.refresh_timing()}
+
+
+@app.get("/api/market/timing/refresh/status")
+def market_timing_refresh_status():
+    """前端轮询刷新进度：state=idle/starting/running/done/error。"""
+    return {"data": timing.refresh_status()}
+
+
 @app.get("/api/market/turnover-top")
 def market_turnover_top():
     """全市场成交额榜 Top20（客观公开榜单数据，非推荐/非预测/不评分）。全站共享缓存 5 分钟。"""

@@ -215,26 +215,31 @@ export interface TurnoverStock {
 }
 export interface TurnoverTop { stocks: TurnoverStock[]; updated: string; quote_date?: string; reason?: string }
 
-// 择时（战法胜率动态）：当前市场阶段 + 各战法月度胜率 K 线序列
+// 择时（战法胜率动态）：当前市场阶段 + 各战法胜率 K 线序列（月线/日线双粒度，含/剔688双口径）
 export interface TimingCandle {
-  month: string;
-  open: number; close: number; high: number; low: number; // T10 均收益%(open=上月, close=本月) / 最好 / 最差
+  month: string; // 月线=YYYY-MM, 日线=YYYY-MM-DD
+  open: number; close: number; high: number; low: number; // 均收益%(open=上一期, close=本期) / 最好 / 最差
   win: number; n: number; // 胜率 / 样本数
 }
 export interface TimingSignal {
-  date: string; code: string; name: string; t10: number | null; stage: string;
+  date: string; code: string; name: string;
+  close0: number | null; price_now: number | null; ret_now: number | null; // 信号日价 / 现价 / 至今收益
+  turnover: number | null; zt_1m: boolean; is_688: boolean; stage: string; // 换手率(%) / 近月涨停 / 是否688 / 阶段
 }
 export interface TimingStrategy {
   name: string; group: string;
-  candles: TimingCandle[];
+  candles_m: TimingCandle[]; candles_m_ex688: TimingCandle[];   // 月度
+  candles_d: TimingCandle[]; candles_d_ex688: TimingCandle[];   // 日线(近12月)
   baseline: { win: number; avg: number } | null;
   stage_win: Record<string, number | null>;
-  recent: TimingSignal[];
+  month: string;
+  recent: TimingSignal[]; // 本月全量信号
 }
 export interface TimingData {
   generated_at: string;
   regime: { current: string; stage: string; gap3m: number | null; vol_chg3m: number | null; breadth3m: number | null };
   stages: string[];
+  daily_range: [string, string];
   strategies: Record<string, TimingStrategy>;
 }
 
@@ -393,6 +398,8 @@ export const api = {
   },
   firstBoard: () => get<FirstBoardData>("/market/first-board"),
   timing: () => get<TimingData>("/market/timing"),
+  timingRefresh: () => request<{ state: string; already?: boolean; error?: string }>("/market/timing/refresh", "POST"),
+  timingRefreshStatus: () => get<{ state: string; started_at: number | null; elapsed_s: number | null; last_error: string | null }>("/market/timing/refresh/status"),
   turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
   globalIndices: () => get<GlobalIndex[]>("/global/indices"),
   globalStock: (symbol: string) => get<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),
