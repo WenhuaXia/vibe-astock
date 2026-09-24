@@ -45,10 +45,11 @@ export function WinRateCandles({ candles, height = 300, granularity = "month", s
           const m = meta[k.dataIndex];
           const d = m.close - m.open;
           const col = d >= 0 ? "text-red-500" : "text-green-500";
+          const sign = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
           return `<div style="font-size:12px;line-height:1.7">
             <b>${m.month}</b>
             <div>${periodLabel}均收益 <b class="${col}">${m.close >= 0 ? "+" : ""}${m.close.toFixed(2)}%</b>（${prevLabel} ${m.open >= 0 ? "+" : ""}${m.open.toFixed(2)}%）</div>
-            <div>当期最好 <span class="text-red-500">+${m.high.toFixed(1)}%</span> · 最差 <span class="text-green-500">${m.low.toFixed(1)}%</span></div>
+            <div>当期最好 <span class="text-red-500">${sign(m.high)}</span> · 最差 <span class="text-green-500">${sign(m.low)}</span></div>
             <div>胜率 <b>${(m.win * 100).toFixed(0)}%</b> · 覆盖信号 ${m.n} 个</div>
           </div>`;
         },

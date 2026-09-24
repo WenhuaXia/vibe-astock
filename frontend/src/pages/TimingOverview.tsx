@@ -70,9 +70,9 @@ export function TimingControls({
     try {
       const r = await api.timingRefresh();
       if (r.state === "error") { setRefreshMsg(`触发失败: ${r.error ?? ""}`); setTimeout(() => setRefreshMsg(null), 5000); return; }
-      if (r.state === "running" && r.already) { setRefreshMsg("刷新已在进行中"); setTimeout(() => setRefreshMsg(null), 3000); return; }
+      if (r.state === "running" && r.already) { setRefreshMsg(r.note ?? "刷新已在进行中"); setTimeout(() => setRefreshMsg(null), 3000); return; }
       setRefreshing(true);
-      setRefreshMsg("已触发，后台跑完整数据链（约6-10分钟），完成自动重载");
+      setRefreshMsg(r.note ?? "已触发，后台跑完整数据链（约6-10分钟），完成自动重载");
     } catch (e) {
       setRefreshMsg(`触发失败: ${e instanceof Error ? e.message : ""}`);
       setTimeout(() => setRefreshMsg(null), 5000);
