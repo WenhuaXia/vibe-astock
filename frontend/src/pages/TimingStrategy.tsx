@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Loader2, AlertCircle, ArrowLeft, BarChart3, List } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, BarChart3, List, ArrowUp, ArrowDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
@@ -27,21 +27,50 @@ function StageBar({ label, value, max, isBest }: { label: string; value: number 
   );
 }
 
-// 本月信号池: 至今表现 + 换手/近月涨停 + 过滤开关
+// 本月信号池: 至今表现 + 换手/近月涨停 + 过滤开关 + 表头点击排序
+type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "turnover" | "zt_1m";
+const COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
+  { key: "date", label: "信号日" },
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "close0", label: "信号日价", num: true },
+  { key: "price_now", label: "现价", num: true },
+  { key: "ret_now", label: "至今", num: true },
+  { key: "turnover", label: "换手", num: true },
+  { key: "zt_1m", label: "近月" },
+];
+
 function MonthPool({ strat }: { strat: TimingStrategy }) {
   const [ex688, setEx688] = useState(false);
   const [minTurnover, setMinTurnover] = useState(false);   // 剔除换手<1%
   const [ztOnly, setZtOnly] = useState(false);             // 只看近月有涨停的
   const [limit, setLimit] = useState(30);
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDesc, setSortDesc] = useState(true);
+
+  // 点表头: 同列反转方向, 换列默认降序(日期类)/升序(文本类)
+  const onSort = (key: SortKey) => {
+    if (key === sortKey) setSortDesc(d => !d);
+    else { setSortKey(key); setSortDesc(key === "date" || key === "close0" || key === "price_now" || key === "ret_now" || key === "turnover"); }
+  };
 
   const rows = useMemo(() => {
     let r = strat.recent;
     if (ex688) r = r.filter(x => !x.is_688);
     if (minTurnover) r = r.filter(x => x.turnover != null && x.turnover >= 1);
     if (ztOnly) r = r.filter(x => x.zt_1m);
-    // 按 至今收益 降序
-    return [...r].sort((a, b) => (b.ret_now ?? -9) - (a.ret_now ?? -9));
-  }, [strat.recent, ex688, minTurnover, ztOnly]);
+    const dir = sortDesc ? -1 : 1;
+    return [...r].sort((a, b) => {
+      const av = a[sortKey]; const bv = b[sortKey];
+      // null/undefined 永远排最后
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "string" && typeof bv === "string") return av.localeCompare(bv) * dir;
+      if (typeof av === "boolean" && typeof bv === "boolean") return (Number(av) - Number(bv)) * dir;
+      return ((av as number) - (bv as number)) * dir;
+    });
+  }, [strat.recent, ex688, minTurnover, ztOnly, sortKey, sortDesc]);
 
   const shown = rows.slice(0, limit);
   return (
@@ -64,14 +93,21 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th className="py-1.5 pr-2">信号日</th>
-              <th className="py-1.5 pr-2">代码</th>
-              <th className="py-1.5 pr-2">名称</th>
-              <th className="py-1.5 pr-2 text-right">信号日价</th>
-              <th className="py-1.5 pr-2 text-right">现价</th>
-              <th className="py-1.5 pr-2 text-right">至今</th>
-              <th className="py-1.5 pr-2 text-right">换手</th>
-              <th className="py-1.5">近月</th>
+              {COLS.map(col => {
+                const active = sortKey === col.key;
+                return (
+                  <th key={col.key} className={cn("py-1.5 pr-2", col.num && "text-right")}>
+                    <button onClick={() => onSort(col.key)}
+                      className={cn("inline-flex items-center gap-0.5 hover:text-foreground transition-colors",
+                        col.num && "flex-row-reverse", active && "text-primary")}>
+                      {col.label}
+                      {active
+                        ? (sortDesc ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)
+                        : <span className="inline-block h-1 w-1 rounded-full bg-muted-foreground/40" />}
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
