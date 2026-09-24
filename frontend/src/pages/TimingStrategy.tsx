@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Loader2, AlertCircle, ArrowLeft, BarChart3, List, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, BarChart3, List, ArrowUp, ArrowDown, Star, BookmarkPlus } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
@@ -8,6 +9,7 @@ import { Disclaimer } from "@/components/ui/Disclaimer";
 import { WinRateCandles } from "@/components/ui/WinRateCandles";
 import { api, type TimingData, type TimingStrategy, type TimingSignal } from "@/lib/api";
 import { TIMING_STRATEGIES } from "@/lib/workspace/modules";
+import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
 
 const STAGE_ORDER = ["增量-抱团", "增量-平衡", "增量-普涨", "存量", "缩量", "过渡"];
@@ -47,6 +49,7 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
   const [limit, setLimit] = useState(30);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDesc, setSortDesc] = useState(true);
+  const [watch, setWatch] = useState<string[]>(() => loadWatch());
 
   // 点表头: 同列反转方向, 换列默认降序(日期类)/升序(文本类)
   const onSort = (key: SortKey) => {
@@ -73,11 +76,36 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
   }, [strat.recent, ex688, minTurnover, ztOnly, sortKey, sortDesc]);
 
   const shown = rows.slice(0, limit);
+
+  // 单只加入自选
+  const addOne = (code: string, name: string) => {
+    if (watch.includes(code)) { toast(`已在自选中（${code} ${name}）`); return; }
+    try {
+      const { next } = addCodes(watch, code);
+      saveWatch(next); setWatch(next);
+      toast(`已加入自选：${code} ${name}`);
+    } catch (e) { toast(e instanceof Error ? e.message : "加入自选失败"); }
+  };
+  // 把当前过滤+排序后的展示行(去重)一键并入自选
+  const addShown = () => {
+    const codes = Array.from(new Set(shown.map(r => r.code)));
+    if (codes.length === 0) { toast("当前没有可加入的信号"); return; }
+    try {
+      const { next, added } = addCodes(watch, codes.join(","));
+      saveWatch(next); setWatch(next);
+      toast(added > 0 ? `已加入自选 ${added} 只（去重后共 ${codes.length} 只）` : "这些代码都已在自选中");
+    } catch (e) { toast(e instanceof Error ? e.message : "加入自选失败"); }
+  };
+
   return (
     <GlassCard>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold"><List className="h-4 w-4 text-primary" /> 本月信号池（{strat.month}）</div>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={addShown} title="把当前列表（过滤+排序后）去重一键加入自选"
+            className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/20">
+            <BookmarkPlus className="h-3 w-3" /> 列表加入自选
+          </button>
           <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted">
             <input type="checkbox" checked={ex688} onChange={e => setEx688(e.target.checked)} className="accent-primary" /> 剔688
           </label>
@@ -108,14 +136,15 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
                   </th>
                 );
               })}
+              <th className="py-1.5 pr-1 text-right"><Star className="ml-auto h-3 w-3" /></th>
             </tr>
           </thead>
           <tbody>
             {shown.map((r) => (
-              <PoolRow key={`${r.code}-${r.date}`} r={r} />
+              <PoolRow key={`${r.code}-${r.date}`} r={r} watched={watch.includes(r.code)} onAdd={() => addOne(r.code, r.name)} />
             ))}
             {shown.length === 0 && (
-              <tr><td colSpan={8} className="py-6 text-center text-xs text-muted-foreground">过滤后无信号</td></tr>
+              <tr><td colSpan={9} className="py-6 text-center text-xs text-muted-foreground">过滤后无信号</td></tr>
             )}
           </tbody>
         </table>
@@ -126,13 +155,13 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
         </button>
       )}
       <p className="mt-2 text-[10px] text-muted-foreground">
-        换手=最新日换手率快照（腾讯）；近月=信号近22个交易日内出现过涨停；至今收益=信号日收盘→最新收盘。点代码跳个股研究。
+        换手=最新日换手率快照（腾讯）；近月=信号近22个交易日内出现过涨停；至今收益=信号日收盘→最新收盘。点代码跳个股研究；点星标（或右上「列表加入自选」）加入自选股。
       </p>
     </GlassCard>
   );
 }
 
-function PoolRow({ r }: { r: TimingSignal }) {
+function PoolRow({ r, watched, onAdd }: { r: TimingSignal; watched: boolean; onAdd: () => void }) {
   return (
     <tr className="border-b border-border/40 last:border-0 hover:bg-muted/30">
       <td className="py-1.5 pr-2 font-mono text-xs text-muted-foreground">{r.date.slice(5)}</td>
@@ -152,6 +181,13 @@ function PoolRow({ r }: { r: TimingSignal }) {
       <td className="py-1.5 text-[11px]">
         {r.zt_1m ? <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-medium text-red-400">涨停</span> : <span className="text-muted-foreground/50">—</span>}
         <span className="ml-1 text-muted-foreground/70">{r.stage || ""}</span>
+      </td>
+      <td className="py-1.5 pr-1 text-right">
+        <button onClick={onAdd} title={watched ? "已在自选中" : "加入自选股"}
+          className={cn("rounded p-1 transition-colors",
+            watched ? "text-primary/70 hover:text-primary" : "text-muted-foreground/40 hover:text-primary hover:bg-muted")}>
+          <Star className={cn("h-3.5 w-3.5", watched && "fill-current")} />
+        </button>
       </td>
     </tr>
   );
