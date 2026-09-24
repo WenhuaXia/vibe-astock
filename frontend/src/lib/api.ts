@@ -398,7 +398,7 @@ export const api = {
   },
   firstBoard: () => get<FirstBoardData>("/market/first-board"),
   timing: () => get<TimingData>("/market/timing"),
-  timingRefresh: () => request<{ state: string; already?: boolean; error?: string }>("/market/timing/refresh", "POST"),
+  timingRefresh: () => request<{ state: string; already?: boolean; error?: string; note?: string }>("/market/timing/refresh", "POST"),
   timingRefreshStatus: () => get<{ state: string; started_at: number | null; elapsed_s: number | null; last_error: string | null }>("/market/timing/refresh/status"),
   turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
   globalIndices: () => get<GlobalIndex[]>("/global/indices"),

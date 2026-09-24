@@ -55,6 +55,11 @@ export function TimingControls({
           setRefreshing(false);
           setRefreshMsg("刷新失败");
           setTimeout(() => setRefreshMsg(null), 5000);
+        } else {
+          // idle / 未知状态兜底：后端重启会让内存态 _state 重置为 idle（不在上述分支），
+          // 若不处理则 refreshing 永不为 false → 按钮永久转圈且无恢复路径。后端没进程=没在跑。
+          setRefreshing(false);
+          setRefreshMsg(null);
         }
       } catch { /* 轮询失败忽略 */ }
     }, 4000);
@@ -64,6 +69,7 @@ export function TimingControls({
   const onRefresh = useCallback(async () => {
     try {
       const r = await api.timingRefresh();
+      if (r.state === "error") { setRefreshMsg(`触发失败: ${r.error ?? ""}`); setTimeout(() => setRefreshMsg(null), 5000); return; }
       if (r.state === "running" && r.already) { setRefreshMsg("刷新已在进行中"); setTimeout(() => setRefreshMsg(null), 3000); return; }
       setRefreshing(true);
       setRefreshMsg("已触发，后台跑完整数据链（约6-10分钟），完成自动重载");
