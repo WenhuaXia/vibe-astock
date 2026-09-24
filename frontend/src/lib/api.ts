@@ -91,7 +91,7 @@ const get = <T>(path: string) => request<T>(path, "GET");
 export interface Quote {
   quote_time?: string | null; amount_wan?: number | null;
   name: string; price: number; last_close: number; change_pct: number;
-  pe_ttm: number; pb: number; mcap_yi: number; turnover_pct: number;
+  pe_ttm: number; pb: number; mcap_yi: number; float_mcap_yi?: number | null; turnover_pct: number;
   limit_up: number; limit_down: number;
 }
 

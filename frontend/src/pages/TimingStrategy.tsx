@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils";
 
 const STAGE_ORDER = ["增量-抱团", "增量-平衡", "增量-普涨", "存量", "缩量", "过渡"];
 
-function StageBar({ label, value, max, isBest }: { label: string; value: number | null; max: number; isBest: boolean }) {
-  const pct = value == null ? 0 : (value / max) * 100;
+function StageBar({ label, value, isBest }: { label: string; value: number | null; isBest: boolean }) {
+  // 100% 硬显示: 条宽=该阶段胜率本身(0.45→45%条宽, 1.0→满格), 不按最大值归一化
+  const pct = value == null ? 0 : Math.max(0, Math.min(100, value * 100));
   return (
     <div className="flex items-center gap-2">
       <span className={cn("w-20 shrink-0 text-xs", isBest ? "font-semibold text-primary" : "text-muted-foreground")}>{label}</span>
@@ -29,8 +30,8 @@ function StageBar({ label, value, max, isBest }: { label: string; value: number 
   );
 }
 
-// 本月信号池: 至今表现 + 换手/近月涨停 + 过滤开关 + 表头点击排序
-type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "turnover" | "zt_1m";
+// 本月信号池: 至今表现 + 换手/流通市值/近月涨停 + 过滤开关 + 表头点击排序
+type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "turnover" | "float_mcap" | "zt_1m";
 const COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
   { key: "date", label: "信号日" },
   { key: "code", label: "代码" },
@@ -39,6 +40,7 @@ const COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
   { key: "price_now", label: "现价", num: true },
   { key: "ret_now", label: "至今", num: true },
   { key: "turnover", label: "换手", num: true },
+  { key: "float_mcap", label: "流通市值", num: true },
   { key: "zt_1m", label: "近月" },
 ];
 
@@ -50,11 +52,13 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDesc, setSortDesc] = useState(true);
   const [watch, setWatch] = useState<string[]>(() => loadWatch());
+  // 流通市值: 数据链离线生成时没有, 按当前展示行的去重代码实时拉(腾讯 f44, 批 400)
+  const [floatMcap, setFloatMcap] = useState<Record<string, number | null>>({});
 
-  // 点表头: 同列反转方向, 换列默认降序(日期类)/升序(文本类)
+  // 点表头: 同列反转方向, 换列默认降序(日期/数值类)/升序(文本类)
   const onSort = (key: SortKey) => {
     if (key === sortKey) setSortDesc(d => !d);
-    else { setSortKey(key); setSortDesc(key === "date" || key === "close0" || key === "price_now" || key === "ret_now" || key === "turnover"); }
+    else { setSortKey(key); setSortDesc(key === "date" || key === "close0" || key === "price_now" || key === "ret_now" || key === "turnover" || key === "float_mcap"); }
   };
 
   const rows = useMemo(() => {
@@ -63,8 +67,11 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
     if (minTurnover) r = r.filter(x => x.turnover != null && x.turnover >= 1);
     if (ztOnly) r = r.filter(x => x.zt_1m);
     const dir = sortDesc ? -1 : 1;
+    // 取比较值: float_mcap 来自实时 map, 其余直接读字段
+    const val = (x: TimingSignal): string | number | boolean | null =>
+      sortKey === "float_mcap" ? (floatMcap[x.code] ?? null) : (x as unknown as Record<string, unknown>)[sortKey] as string | number | boolean | null;
     return [...r].sort((a, b) => {
-      const av = a[sortKey]; const bv = b[sortKey];
+      const av = val(a); const bv = val(b);
       // null/undefined 永远排最后
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
@@ -73,18 +80,51 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
       if (typeof av === "boolean" && typeof bv === "boolean") return (Number(av) - Number(bv)) * dir;
       return ((av as number) - (bv as number)) * dir;
     });
-  }, [strat.recent, ex688, minTurnover, ztOnly, sortKey, sortDesc]);
+  }, [strat.recent, ex688, minTurnover, ztOnly, sortKey, sortDesc, floatMcap]);
 
   const shown = rows.slice(0, limit);
 
-  // 单只加入自选
-  const addOne = (code: string, name: string) => {
-    if (watch.includes(code)) { toast(`已在自选中（${code} ${name}）`); return; }
+  // 展示行(去重代码)变化时, 分批拉流通市值。依赖"排序后去重的代码串"(与顺序无关),
+  // 避免 rows 因 floatMcap 变化重排 → shown 新引用 → 反复重拉的死循环。
+  const shownCodes = useMemo(
+    () => Array.from(new Set(shown.map(r => r.code))).sort().join(","),
+    [shown],
+  );
+  useEffect(() => {
+    if (!shownCodes) { setFloatMcap({}); return; }
+    const codes = shownCodes.split(",");
+    let alive = true;
+    (async () => {
+      const acc: Record<string, number | null> = {};
+      for (let i = 0; i < codes.length; i += 400) {
+        const chunk = codes.slice(i, i + 400);
+        try {
+          const q = await api.quote(chunk.join(","));
+          for (const c of chunk) acc[c] = q[c]?.float_mcap_yi ?? null;
+        } catch {
+          for (const c of chunk) acc[c] = null;
+        }
+        if (!alive) return;
+      }
+      if (alive) setFloatMcap(acc);
+    })();
+    return () => { alive = false; };
+  }, [shownCodes]);
+
+  // 星标: 已自选→点掉(取消); 未自选→加入
+  const toggleWatch = (code: string, name: string) => {
+    const inWatch = watch.includes(code);
     try {
-      const { next } = addCodes(watch, code);
-      saveWatch(next); setWatch(next);
-      toast(`已加入自选：${code} ${name}`);
-    } catch (e) { toast(e instanceof Error ? e.message : "加入自选失败"); }
+      if (inWatch) {
+        const next = watch.filter(c => c !== code);
+        saveWatch(next); setWatch(next);
+        toast(`已取消自选：${code} ${name}`);
+      } else {
+        const { next } = addCodes(watch, code);
+        saveWatch(next); setWatch(next);
+        toast(`已加入自选：${code} ${name}`);
+      }
+    } catch (e) { toast(e instanceof Error ? e.message : "更新自选失败"); }
   };
   // 把当前过滤+排序后的展示行(去重)一键并入自选
   const addShown = () => {
@@ -141,10 +181,10 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
           </thead>
           <tbody>
             {shown.map((r) => (
-              <PoolRow key={`${r.code}-${r.date}`} r={r} watched={watch.includes(r.code)} onAdd={() => addOne(r.code, r.name)} />
+              <PoolRow key={`${r.code}-${r.date}`} r={r} floatMcap={floatMcap[r.code]} watched={watch.includes(r.code)} onToggle={() => toggleWatch(r.code, r.name)} />
             ))}
             {shown.length === 0 && (
-              <tr><td colSpan={9} className="py-6 text-center text-xs text-muted-foreground">过滤后无信号</td></tr>
+              <tr><td colSpan={10} className="py-6 text-center text-xs text-muted-foreground">过滤后无信号</td></tr>
             )}
           </tbody>
         </table>
@@ -155,13 +195,13 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
         </button>
       )}
       <p className="mt-2 text-[10px] text-muted-foreground">
-        换手=最新日换手率快照（腾讯）；近月=信号近22个交易日内出现过涨停；至今收益=信号日收盘→最新收盘。点代码跳个股研究；点星标（或右上「列表加入自选」）加入自选股。
+        换手=最新日换手率快照（腾讯）；流通市值=实时行情（腾讯 f44，当前页展示行，千亿/亿自适应）；近月=信号近22个交易日内出现过涨停；至今收益=信号日收盘→最新收盘。点代码跳个股研究；点星标加入/取消自选（实心=已在自选，点击可取消）；右上「列表加入自选」批量并入。
       </p>
     </GlassCard>
   );
 }
 
-function PoolRow({ r, watched, onAdd }: { r: TimingSignal; watched: boolean; onAdd: () => void }) {
+function PoolRow({ r, floatMcap, watched, onToggle }: { r: TimingSignal; floatMcap: number | null; watched: boolean; onToggle: () => void }) {
   return (
     <tr className="border-b border-border/40 last:border-0 hover:bg-muted/30">
       <td className="py-1.5 pr-2 font-mono text-xs text-muted-foreground">{r.date.slice(5)}</td>
@@ -178,14 +218,19 @@ function PoolRow({ r, watched, onAdd }: { r: TimingSignal; watched: boolean; onA
       <td className={cn("py-1.5 pr-2 text-right font-mono text-xs", r.turnover == null ? "text-muted-foreground/50" : r.turnover < 1 ? "text-muted-foreground/60" : "text-foreground")}>
         {r.turnover == null ? "—" : `${r.turnover.toFixed(1)}%`}
       </td>
+      <td className="py-1.5 pr-2 text-right font-mono text-xs">
+        {floatMcap == null ? <span className="text-muted-foreground/50">—</span>
+          : floatMcap >= 100 ? <span>{(floatMcap / 100).toFixed(2)}千亿</span>
+          : <span>{floatMcap.toFixed(0)}亿</span>}
+      </td>
       <td className="py-1.5 text-[11px]">
         {r.zt_1m ? <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-medium text-red-400">涨停</span> : <span className="text-muted-foreground/50">—</span>}
         <span className="ml-1 text-muted-foreground/70">{r.stage || ""}</span>
       </td>
       <td className="py-1.5 pr-1 text-right">
-        <button onClick={onAdd} title={watched ? "已在自选中" : "加入自选股"}
+        <button onClick={onToggle} title={watched ? "点击取消自选" : "点击加入自选股"}
           className={cn("rounded p-1 transition-colors",
-            watched ? "text-primary/70 hover:text-primary" : "text-muted-foreground/40 hover:text-primary hover:bg-muted")}>
+            watched ? "text-primary hover:text-red-500" : "text-muted-foreground/40 hover:text-primary hover:bg-muted")}>
           <Star className={cn("h-3.5 w-3.5", watched && "fill-current")} />
         </button>
       </td>
@@ -309,7 +354,7 @@ export function TimingStrategyPage() {
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><BarChart3 className="h-4 w-4 text-primary" /> 阶段适配（哪个时期用它最准，十年 T10 胜率）</div>
           <div className="space-y-2">
             {STAGE_ORDER.filter(s => strat.stage_win[s] !== null && strat.stage_win[s] !== undefined).map(stage => (
-              <StageBar key={stage} label={stage} value={strat.stage_win[stage]} max={maxWin} isBest={strat.stage_win[stage] === maxWin} />
+              <StageBar key={stage} label={stage} value={strat.stage_win[stage]} isBest={strat.stage_win[stage] === maxWin} />
             ))}
             {wins.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">暂无阶段数据</p>}
           </div>
