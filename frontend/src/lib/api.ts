@@ -218,6 +218,13 @@ export interface TurnoverTop { stocks: TurnoverStock[]; updated: string; quote_d
 // 择时（战法胜率动态）：当前市场阶段 + 各战法胜率 K 线序列（月线/日线双粒度，含/剔688双口径）
 // v3: 收益均为税前口径; stage_stats 带样本量; 三档衰减/持有期曲线; 信号行带结算状态
 export interface TimingStat { win: number; avg: number; n: number; avg_net?: number }
+export interface TimingExpected {
+  payoff: number | null;          // 盈亏比 = 均盈/|均亏|
+  avg_win: number | null; avg_loss: number | null;
+  median: number; p90: number; p10: number;  // 十年已结算T10分位(税前)
+  max_consec_lose_months: number; // 月度K线 win<50% 最长连续段
+  worst_month: { month: string; close: number; n: number } | null;
+}
 export interface TimingCandle {
   month: string; // 月线=YYYY-MM, 日线=YYYY-MM-DD
   open: number; close: number; high: number; low: number; // 均收益%(open=上一期, close=本期) / 最好 / 最差
@@ -247,6 +254,7 @@ export interface TimingStrategy {
   stage_stats: Record<string, TimingStat | null>;                  // 阶段 {win,avg,n,avg_net}
   decay: Record<"y10" | "y3" | "y1", TimingStat | null>;           // 三档衰减
   hold_curve: Record<"T5" | "T10" | "T20", TimingStat | null>;     // 持有期衰减
+  expected: TimingExpected | null;                                 // 期望画像(盈亏比/分位/连亏月)
   month: string;
   recent: TimingSignal[]; // 本月全量信号
 }
@@ -256,6 +264,7 @@ export interface TimingData {
             months_in: number; prev_stage: string | null; provisional: boolean };
   stages: string[];
   daily_range: [string, string];
+  stage_month: Record<string, string>;                             // 逐月市场阶段(色带用)
   cost: { round_trip: number; note: string };
   recommendation: { rows: TimingRecRow[]; top: string[]; all_below_half: boolean };
   survivorship: { kline_codes: number; delisted_in_warehouse: number; note: string };

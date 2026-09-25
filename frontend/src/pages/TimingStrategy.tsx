@@ -82,6 +82,34 @@ function HoldCurve({ curve }: { curve: TimingStrategy["hold_curve"] }) {
   );
 }
 
+// 期望画像(P2-1): 盈亏比 / 均盈均亏 / 中位数 / 最大连亏月 / 最差单月 —— 回测与实盘之间最大的鸿沟
+function ExpectedCard({ expected }: { expected: NonNullable<TimingStrategy["expected"]> }) {
+  const e = expected;
+  return (
+    <GlassCard className="py-3">
+      <div className="mb-1.5 text-xs text-muted-foreground">期望画像（十年已结算 T10 · 税前）</div>
+      <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-center">
+        <div>
+          <div className={cn("font-mono text-sm font-bold", (e.payoff ?? 0) >= 1.3 ? "text-red-400" : (e.payoff ?? 0) < 1 ? "text-green-400" : "text-foreground")}>{e.payoff == null ? "—" : e.payoff.toFixed(2)}</div>
+          <div className="text-[9px] text-muted-foreground/70">盈亏比</div>
+        </div>
+        <div>
+          <div className="font-mono text-sm font-bold">{e.median >= 0 ? "+" : ""}{(e.median * 100).toFixed(1)}%</div>
+          <div className="text-[9px] text-muted-foreground/70">中位数</div>
+        </div>
+        <div>
+          <div className="font-mono text-sm font-bold">{e.max_consec_lose_months}<span className="text-[10px] text-muted-foreground/60"> 月</span></div>
+          <div className="text-[9px] text-muted-foreground/70">最大连亏月</div>
+        </div>
+      </div>
+      <div className="mt-1.5 border-t border-border/50 pt-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
+        <div>P90 <span className="text-red-400/80">{e.p90 >= 0 ? "+" : ""}{(e.p90 * 100).toFixed(1)}%</span> · P10 <span className="text-green-400/80">{e.p10 >= 0 ? "+" : ""}{(e.p10 * 100).toFixed(1)}%</span>{e.avg_win != null && e.avg_loss != null && <> · 均盈 <span className="text-red-400/80">+{(e.avg_win * 100).toFixed(1)}%</span> / 均亏 <span className="text-green-400/80">{(e.avg_loss * 100).toFixed(1)}%</span></>}</div>
+        {e.worst_month && <div>最差单月 <span className="text-green-400/80">{e.worst_month.close >= 0 ? "+" : ""}{e.worst_month.close.toFixed(1)}%</span>（{e.worst_month.month}）</div>}
+      </div>
+    </GlassCard>
+  );
+}
+
 // 本月信号池: T+10已结算/持有中 分区 + 同股去重 + 可买性过滤默认开
 type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "t10" | "turnover" | "float_mcap" | "zt_1m";
 const SETTLED_COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
@@ -463,7 +491,8 @@ export function TimingStrategyPage() {
         title={title}
         subtitle={`${strat.group}风格 · 胜率 K 线 + 三档衰减 + 阶段适配(含样本量) + 本月信号池(已结算/持有中分区)`}
         actions={<Caliber text={
-          "胜率K线: 月线每根=当月全部信号T+10, 日线每根=当日全部持仓中信号的累计收益(近12月, 可滚轮缩放)。最后一根灰色=进行中, 未结算。\n" +
+          "胜率K线: 月线每根=当月全部信号T+10, 日线每根=当日全部持仓中信号的累计收益(近12月, 可滚轮缩放)。最后一根灰色=进行中, 未结算。K线背景色带=该期市场阶段(红=增量抱团/橙=增量平衡/绿=增量普涨/蓝=存量/灰=缩量/浅灰=过渡), 把战法表现与环境对照着看。\n" +
+          "期望画像: 盈亏比=十年已结算T10的均盈/均亏; 最大连亏月=月度胜率<50%的最长连续段; 最差单月=十年里均收益最低的月。用来判断拿得住拿不住——中位数为负说明一半信号是亏的, 靠少数大赚拉回来。\n" +
           "成本口径: 默认【税前】; 勾选税后=税前-往返约0.2%(佣金万2.5双边+印花税0.05%卖出+滑点0.1%)。\n" +
           "三档胜率: 10年/3年/1年全部已结算T+10信号; 近1年较10年衰减>10pct标黄警示。\n" +
           "持有期衰减: T5/T10/T20 三持有期的胜率与均收益, 看收益集中在哪段。\n" +
@@ -474,7 +503,7 @@ export function TimingStrategyPage() {
         } />}
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <GlassCard className="relative py-3 text-center">
           <button onClick={() => setNet(v => !v)} title="税前/税后切换"
             className={cn("absolute right-1.5 top-1.5 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors",
@@ -500,6 +529,7 @@ export function TimingStrategyPage() {
           <div className={cn("mt-1 font-mono text-lg font-bold", mLast && mLast.close >= 0 ? "text-red-500" : "text-green-500")}>{mLast ? `${mLast.close >= 0 ? "+" : ""}${mLast.close.toFixed(1)}%` : "—"}</div>
           <div className="text-[10px] text-muted-foreground">{mLast ? `胜率 ${(mLast.win * 100).toFixed(0)}% · n=${mLast.n.toLocaleString()} ⏳进行中` : ""}</div>
         </GlassCard>
+        {strat.expected && <ExpectedCard expected={strat.expected} />}
       </div>
 
       <GlassCard className="mt-4">
@@ -525,7 +555,7 @@ export function TimingStrategyPage() {
             ? (granularity === "month" ? strat.candles_m_ex688 : strat.candles_d_ex688)
             : (granularity === "month" ? strat.candles_m : strat.candles_d);
           return candles.length
-            ? <WinRateCandles candles={candles} height={360} granularity={granularity} inProgress />
+            ? <WinRateCandles candles={candles} height={360} granularity={granularity} inProgress stageByMonth={data.stage_month} />
             : <p className="py-10 text-center text-xs text-muted-foreground">该战法暂无信号</p>;
         })()}
         {granularity === "day" && <p className="mt-1 text-[10px] text-muted-foreground">日线口径：每根=该日处于 10 日持仓窗口内的全部信号（信号日收盘买入、持有至 T+10）的平均累计收益。滚轮可缩放。最后一根=当日未走完。</p>}
