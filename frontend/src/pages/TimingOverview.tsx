@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, AlertCircle, Clock, ChevronRight, RefreshCw, TrendingUp } from "lucide-react";
+import { Loader2, AlertCircle, Clock, ChevronRight, RefreshCw, TrendingUp, BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
@@ -99,6 +99,102 @@ function RecTable({ data }: { data: TimingData }) {
           </tbody>
         </table>
       </div>
+    </GlassCard>
+  );
+}
+
+// 多战法共振(P2-7): 同一信号日被≥2战法同时指向的个股, 跨风格共振(左侧+右侧)最强
+function ResonanceView({ data }: { data: TimingData }) {
+  // (code,date) → 命中的战法签名集合; 只取本月
+  const dayHits = useMemo(() => {
+    const m = new Map<string, { code: string; date: string; name: string; sigs: string[]; groups: Set<string>; ret?: number }>();
+    const curMonth = data.regime.current;
+    for (const [sig, st] of Object.entries(data.strategies)) {
+      for (const r of st.recent) {
+        if (r.date.slice(0, 7) !== curMonth) continue;
+        const key = `${r.code}|${r.date}`;
+        let e = m.get(key);
+        if (!e) { e = { code: r.code, date: r.date, name: r.name, sigs: [], groups: new Set() }; m.set(key, e); }
+        e.sigs.push(sig);
+        e.groups.add(st.group);
+      }
+    }
+    return Array.from(m.values()).filter(e => e.sigs.length >= 2).sort((a, b) =>
+      (b.sigs.length - a.sigs.length) || a.date.localeCompare(b.date));
+  }, [data]);
+
+  const isCrossStyle = (g: Set<string>) => g.has("左侧超跌") && (g.has("趋势右侧") || g.has("短线动量") || g.has("打板"));
+  const cross = dayHits.filter(e => isCrossStyle(e.groups));
+  const [minSigs, setMinSigs] = useState(2);
+  const shown = dayHits.filter(e => e.sigs.length >= minSigs).slice(0, 40);
+  const sigName = (s: string) => data.strategies[s]?.name ?? s;
+
+  return (
+    <GlassCard className="mb-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">多战法共振 · {data.regime.current} 同日被≥2战法指向</span>
+        <Caliber text={
+          "同一信号日被多个战法同时命中的个股(不同战法独立触发, 非人为凑)。\n" +
+          "跨风格共振=左侧超跌战法与右侧(趋势/动量/打板)战法同日同时看多同一只——底部超跌与右侧信号互相印证, 比单一风格内共振更强(单风格常是同一天普涨的集体反应)。\n" +
+          "注意: 共振=信号聚合度, 不是胜率保证, 需结合当前阶段胜率判断。"
+        } />
+        <span className="ml-auto text-[11px] text-muted-foreground">
+          共 {dayHits.length} 个 · 跨风格 {cross.length} 个
+        </span>
+        <select value={minSigs} onChange={e => setMinSigs(Number(e.target.value))}
+          className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground">
+          <option value={2}>≥2 战法</option>
+          <option value={3}>≥3 战法</option>
+          <option value={4}>≥4 战法</option>
+        </select>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="py-1.5 pr-2">信号日</th>
+              <th className="py-1.5 pr-2">代码</th>
+              <th className="py-1.5 pr-2">名称</th>
+              <th className="py-1.5 pr-2 text-center">共振数</th>
+              <th className="py-1.5 pr-2">命中战法（跨风格标黄）</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map(e => {
+              const isCross = isCrossStyle(e.groups);
+              return (
+                <tr key={`${e.code}-${e.date}`} className="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                  <td className="py-1.5 pr-2 font-mono text-xs text-muted-foreground">{e.date.slice(5)}</td>
+                  <td className="py-1.5 pr-2"><Link to={`/stock-data?symbol=${e.code}`} className="font-mono text-xs text-primary hover:underline">{e.code}</Link></td>
+                  <td className="py-1.5 pr-2 text-xs">{e.name}</td>
+                  <td className="py-1.5 pr-2 text-center">
+                    <span className={cn("inline-block rounded-md px-1.5 py-0.5 text-[11px] font-bold",
+                      e.sigs.length >= 4 ? "bg-emerald-500/20 text-emerald-300" : e.sigs.length === 3 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground")}>
+                      ×{e.sigs.length}
+                    </span>
+                  </td>
+                  <td className="py-1.5 pr-2 text-[11px]">
+                    <div className="flex flex-wrap gap-1">
+                      {e.sigs.map(s => (
+                        <Link key={s} to={`/timing/${s}`}
+                          className={cn("rounded px-1.5 py-0.5 hover:underline",
+                            isCross ? "bg-amber-500/15 text-amber-300" : "bg-muted text-foreground/80")}>
+                          {sigName(s)}
+                        </Link>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {shown.length === 0 && (
+              <tr><td colSpan={5} className="py-6 text-center text-xs text-muted-foreground">本月暂无 {minSigs} 战法以上共振</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {shown.length < dayHits.length && <div className="mt-1 text-right text-[11px] text-muted-foreground">显示前 40 条 / 共 {dayHits.length}</div>}
     </GlassCard>
   );
 }
@@ -266,6 +362,7 @@ export function TimingOverview() {
       />
 
       {data && <RecTable data={data} />}
+      {data && <ResonanceView data={data} />}
       <TimingControls granularity={granularity} setGranularity={setGranularity} ex688={ex688} setEx688={setEx688} data={data} setData={setData} />
 
       {loading && (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Loader2, AlertCircle, ArrowLeft, BarChart3, List, ArrowUp, ArrowDown, Star, BookmarkPlus } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, BarChart3, List, ArrowUp, ArrowDown, Star, BookmarkPlus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -308,6 +308,35 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
     } catch (e) { toast(e instanceof Error ? e.message : "加入自选失败"); }
   };
 
+  // 导出当前过滤+去重结果(全部, 不受显示条数限制)为 CSV, 职业股民拿去自己算
+  const exportCsv = () => {
+    const all = [...settled, ...holding];
+    const dedup = new Map<string, TimingSignal>();
+    for (const x of all) { const cur = dedup.get(x.code); if (!cur || x.date >= cur.date) dedup.set(x.code, x); }
+    const rows = Array.from(dedup.values());
+    if (rows.length === 0) { toast("当前没有可导出的信号"); return; }
+    const head = ["状态", "信号日", "代码", "名称", "信号日价", "T+10税后", "最大回撤", "现价", "至今", "已持天数", "换手%", "流通市值亿", "近月涨停", "阶段"];
+    const esc = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [head.join(",")];
+    for (const r of rows) {
+      lines.push([
+        r.settled ? "已结算" : "持有中", r.date, r.code, esc(r.name),
+        r.close0, r.t10 != null ? (r.t10 * 100).toFixed(2) + "%" : "",
+        r.mae != null ? (r.mae * 100).toFixed(1) + "%" : "",
+        r.price_now, r.ret_now != null ? (r.ret_now * 100).toFixed(2) + "%" : "",
+        r.hold_days, r.turnover, floatMcap[r.code], r.zt_1m ? "是" : "", r.stage,
+      ].join(","));
+    }
+    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${strat.name}_信号池_${strat.month}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast(`已导出 ${rows.length} 条（去重）`);
+  };
+
   const renderTable = (cols: Array<{ key: SortKey; label: string; num?: boolean }>, view: { latest: TimingSignal; count: number }[], key: SortKey, desc: boolean, zone: "s" | "h", isSettled: boolean) => (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -355,6 +384,10 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
           <button onClick={addShown} title="把当前列表（过滤+排序后）去重一键加入自选"
             className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/20">
             <BookmarkPlus className="h-3 w-3" /> 列表加入自选
+          </button>
+          <button onClick={exportCsv} title="导出当前过滤+去重结果（全部，不受显示条数限制）为 CSV"
+            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted">
+            <Download className="h-3 w-3" /> 导出CSV
           </button>
           <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted">
             <input type="checkbox" checked={ex688} onChange={e => setEx688(e.target.checked)} className="accent-primary" /> 剔688
