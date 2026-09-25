@@ -273,6 +273,7 @@ export interface TimingData {
   stages: string[];
   daily_range: [string, string];
   stage_month: Record<string, string>;                             // 逐月市场阶段(色带用)
+  random_baseline: TimingStat | null;                              // 随机入场T10基准(48%胜率=无脑买入线)
   cost: { round_trip: number; note: string };
   recommendation: { rows: TimingRecRow[]; top: string[]; all_below_half: boolean };
   survivorship: { kline_codes: number; delisted_in_warehouse: number; note: string };

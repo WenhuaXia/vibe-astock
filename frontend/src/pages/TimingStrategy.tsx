@@ -7,7 +7,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { WinRateCandles } from "@/components/ui/WinRateCandles";
-import { api, type TimingData, type TimingStrategy, type TimingSignal } from "@/lib/api";
+import { api, type TimingData, type TimingStrategy, type TimingSignal, type TimingStat } from "@/lib/api";
 import { TIMING_STRATEGIES } from "@/lib/workspace/modules";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
@@ -82,7 +82,37 @@ function HoldCurve({ curve }: { curve: TimingStrategy["hold_curve"] }) {
   );
 }
 
-// 期望画像(P2-1) + 持有期回撤(P2-2): 盈亏比 / 中位数 / 最大连亏月 / 最差单月 / MAE —— 回测与实盘之间最大的鸿沟
+// 超额 alpha(P2-3): 战法 vs 随机入场基准 —— 跑不赢"随便挑一天买"=没有选股能力
+function AlphaCard({ baseline, randomBaseline }: { baseline: TimingStrategy["baseline"]; randomBaseline: TimingStat | null }) {
+  if (!baseline || !randomBaseline) {
+    return (
+      <GlassCard className="py-3">
+        <div className="text-xs text-muted-foreground">vs 随机入场</div>
+        <div className="mt-1 font-mono text-sm text-muted-foreground/50">—</div>
+      </GlassCard>
+    );
+  }
+  const exWin = (baseline.win - randomBaseline.win) * 100;
+  const exAvg = (baseline.avg - randomBaseline.avg) * 100;
+  const good = exWin >= 1 && exAvg >= 0;
+  const bad = exWin <= -5 || exAvg <= -0.5;
+  return (
+    <GlassCard className="py-3">
+      <div className="text-xs text-muted-foreground">vs 随机入场（无脑基准）</div>
+      <div className={cn("mt-1 font-mono text-base font-bold", good ? "text-red-400" : bad ? "text-green-500" : "text-foreground")}>
+        {exWin >= 0 ? "+" : ""}{exWin.toFixed(1)}pct
+      </div>
+      <div className="font-mono text-[10px] text-muted-foreground">
+        超额胜率 · 均收益 {exAvg >= 0 ? "+" : ""}{exAvg.toFixed(2)}%
+      </div>
+      <div className="mt-1 text-[9px] leading-tight text-muted-foreground/70">
+        随机买入 胜率{(randomBaseline.win * 100).toFixed(0)}% / 均{(randomBaseline.avg * 100).toFixed(2)}%
+      </div>
+    </GlassCard>
+  );
+}
+
+// 期望画像(P2-1) + 持有期回撤(P2-2): 盈亏比 / 中位数 / 最大连亏月 / 最差单月 / MAE
 function ExpectedCard({ expected, mae }: { expected: NonNullable<TimingStrategy["expected"]>; mae?: NonNullable<TimingStrategy["mae"]> }) {
   const e = expected;
   return (
@@ -514,6 +544,12 @@ export function TimingStrategyPage() {
           "红涨绿跌(A股)。"
         } />}
       />
+
+      {data.random_baseline && (
+        <div className="mb-3">
+          <AlphaCard baseline={strat.baseline} randomBaseline={data.random_baseline} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <GlassCard className="relative py-3 text-center">
