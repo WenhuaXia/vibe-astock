@@ -82,8 +82,8 @@ function HoldCurve({ curve }: { curve: TimingStrategy["hold_curve"] }) {
   );
 }
 
-// 期望画像(P2-1): 盈亏比 / 均盈均亏 / 中位数 / 最大连亏月 / 最差单月 —— 回测与实盘之间最大的鸿沟
-function ExpectedCard({ expected }: { expected: NonNullable<TimingStrategy["expected"]> }) {
+// 期望画像(P2-1) + 持有期回撤(P2-2): 盈亏比 / 中位数 / 最大连亏月 / 最差单月 / MAE —— 回测与实盘之间最大的鸿沟
+function ExpectedCard({ expected, mae }: { expected: NonNullable<TimingStrategy["expected"]>; mae?: NonNullable<TimingStrategy["mae"]> }) {
   const e = expected;
   return (
     <GlassCard className="py-3">
@@ -105,19 +105,26 @@ function ExpectedCard({ expected }: { expected: NonNullable<TimingStrategy["expe
       <div className="mt-1.5 border-t border-border/50 pt-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
         <div>P90 <span className="text-red-400/80">{e.p90 >= 0 ? "+" : ""}{(e.p90 * 100).toFixed(1)}%</span> · P10 <span className="text-green-400/80">{e.p10 >= 0 ? "+" : ""}{(e.p10 * 100).toFixed(1)}%</span>{e.avg_win != null && e.avg_loss != null && <> · 均盈 <span className="text-red-400/80">+{(e.avg_win * 100).toFixed(1)}%</span> / 均亏 <span className="text-green-400/80">{(e.avg_loss * 100).toFixed(1)}%</span></>}</div>
         {e.worst_month && <div>最差单月 <span className="text-green-400/80">{e.worst_month.close >= 0 ? "+" : ""}{e.worst_month.close.toFixed(1)}%</span>（{e.worst_month.month}）</div>}
+        {mae && (
+          <div className="mt-1 rounded bg-muted/40 px-1.5 py-1">
+            <div className="text-[9px] text-muted-foreground/70">持有10日内最大回撤（错了亏多少）</div>
+            <div>中位 <span className="text-green-400/90">{(mae.median * 100).toFixed(1)}%</span> · <b className={cn(mae.below_8pct >= 0.4 ? "text-red-400" : "text-foreground")}>{(mae.below_8pct * 100).toFixed(0)}%</b> 信号触 -8% 止损线</div>
+          </div>
+        )}
       </div>
     </GlassCard>
   );
 }
 
 // 本月信号池: T+10已结算/持有中 分区 + 同股去重 + 可买性过滤默认开
-type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "t10" | "turnover" | "float_mcap" | "zt_1m";
+type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "t10" | "mae" | "turnover" | "float_mcap" | "zt_1m";
 const SETTLED_COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
   { key: "date", label: "信号日" },
   { key: "code", label: "代码" },
   { key: "name", label: "名称" },
   { key: "close0", label: "信号日价", num: true },
   { key: "t10", label: "T+10税后", num: true },
+  { key: "mae", label: "最大回撤", num: true },
   { key: "turnover", label: "换手", num: true },
   { key: "float_mcap", label: "流通市值", num: true },
   { key: "zt_1m", label: "近月" },
@@ -394,9 +401,14 @@ function PoolRow({ r, count, floatMcap, watched, onToggle, showT10 }: { r: Timin
       </td>
       <td className="py-1.5 pr-2 text-right font-mono text-xs">{r.close0 != null ? r.close0.toFixed(2) : "—"}</td>
       {showT10 ? (
-        <td className={cn("py-1.5 pr-2 text-right font-mono text-xs font-medium", r.t10 == null ? "text-muted-foreground/50" : r.t10 >= 0 ? "text-red-500" : "text-green-500")}>
-          {r.t10 == null ? "—" : `${r.t10 >= 0 ? "+" : ""}${(r.t10 * 100).toFixed(2)}%`}
-        </td>
+        <>
+          <td className={cn("py-1.5 pr-2 text-right font-mono text-xs font-medium", r.t10 == null ? "text-muted-foreground/50" : r.t10 >= 0 ? "text-red-500" : "text-green-500")}>
+            {r.t10 == null ? "—" : `${r.t10 >= 0 ? "+" : ""}${(r.t10 * 100).toFixed(2)}%`}
+          </td>
+          <td className={cn("py-1.5 pr-2 text-right font-mono text-xs", r.mae == null ? "text-muted-foreground/50" : r.mae <= -0.08 ? "text-amber-400" : "text-muted-foreground")}>
+            {r.mae == null ? "—" : `${(r.mae * 100).toFixed(1)}%`}
+          </td>
+        </>
       ) : (
         <>
           <td className="py-1.5 pr-2 text-right font-mono text-xs">{r.price_now != null ? r.price_now.toFixed(2) : "—"}</td>
@@ -529,7 +541,7 @@ export function TimingStrategyPage() {
           <div className={cn("mt-1 font-mono text-lg font-bold", mLast && mLast.close >= 0 ? "text-red-500" : "text-green-500")}>{mLast ? `${mLast.close >= 0 ? "+" : ""}${mLast.close.toFixed(1)}%` : "—"}</div>
           <div className="text-[10px] text-muted-foreground">{mLast ? `胜率 ${(mLast.win * 100).toFixed(0)}% · n=${mLast.n.toLocaleString()} ⏳进行中` : ""}</div>
         </GlassCard>
-        {strat.expected && <ExpectedCard expected={strat.expected} />}
+        {strat.expected && <ExpectedCard expected={strat.expected} mae={strat.mae ?? undefined} />}
       </div>
 
       <GlassCard className="mt-4">

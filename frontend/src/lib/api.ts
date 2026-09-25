@@ -225,6 +225,12 @@ export interface TimingExpected {
   max_consec_lose_months: number; // 月度K线 win<50% 最长连续段
   worst_month: { month: string; close: number; n: number } | null;
 }
+export interface TimingMae {
+  median: number;                 // 持有10日内最大回撤中位数
+  p10: number;                    // 10%信号回撤比这还深
+  below_8pct: number;             // 触及-8%止损线的信号占比
+  n: number;                      // 采样数(2万固定种子)
+}
 export interface TimingCandle {
   month: string; // 月线=YYYY-MM, 日线=YYYY-MM-DD
   open: number; close: number; high: number; low: number; // 均收益%(open=上一期, close=本期) / 最好 / 最差
@@ -235,6 +241,7 @@ export interface TimingSignal {
   close0: number | null; price_now: number | null; ret_now: number | null; // 信号日价 / 现价 / 至今收益
   turnover: number | null; zt_1m: boolean; is_688: boolean; stage: string; // 换手率(%) / 近月涨停 / 是否688 / 阶段
   settled: boolean; hold_days: number | null; t10: number | null; // T10是否结算 / 已持交易日数 / T10税后收益
+  mae: number | null; // 持有10日内最大回撤(负数, 已结算信号)
   is_bj: boolean; is_st: boolean; // 北交所 / ST
 }
 export interface TimingRecRow {
@@ -255,6 +262,7 @@ export interface TimingStrategy {
   decay: Record<"y10" | "y3" | "y1", TimingStat | null>;           // 三档衰减
   hold_curve: Record<"T5" | "T10" | "T20", TimingStat | null>;     // 持有期衰减
   expected: TimingExpected | null;                                 // 期望画像(盈亏比/分位/连亏月)
+  mae: TimingMae | null;                                           // 持有期最大不利波动(错了亏多少)
   month: string;
   recent: TimingSignal[]; // 本月全量信号
 }
