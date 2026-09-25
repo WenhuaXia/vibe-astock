@@ -242,6 +242,7 @@ export interface TimingSignal {
   turnover: number | null; zt_1m: boolean; is_688: boolean; stage: string; // 换手率(%) / 近月涨停 / 是否688 / 阶段
   settled: boolean; hold_days: number | null; t10: number | null; // T10是否结算 / 已持交易日数 / T10税后收益
   mae: number | null; // 持有10日内最大回撤(负数, 已结算信号)
+  industry: string | null; same_ind_n: number | null; // 行业(证监会) / 同日同板块被本战法命中的个股数
   is_bj: boolean; is_st: boolean; // 北交所 / ST
 }
 export interface TimingRecRow {

@@ -147,11 +147,12 @@ function ExpectedCard({ expected, mae }: { expected: NonNullable<TimingStrategy[
 }
 
 // 本月信号池: T+10已结算/持有中 分区 + 同股去重 + 可买性过滤默认开
-type SortKey = "date" | "code" | "name" | "close0" | "price_now" | "ret_now" | "t10" | "mae" | "turnover" | "float_mcap" | "zt_1m";
+type SortKey = "date" | "code" | "name" | "industry" | "close0" | "price_now" | "ret_now" | "t10" | "mae" | "turnover" | "float_mcap" | "zt_1m";
 const SETTLED_COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
   { key: "date", label: "信号日" },
   { key: "code", label: "代码" },
   { key: "name", label: "名称" },
+  { key: "industry", label: "板块" },
   { key: "close0", label: "信号日价", num: true },
   { key: "t10", label: "T+10税后", num: true },
   { key: "mae", label: "最大回撤", num: true },
@@ -163,6 +164,7 @@ const HOLD_COLS: Array<{ key: SortKey; label: string; num?: boolean }> = [
   { key: "date", label: "信号日" },
   { key: "code", label: "代码" },
   { key: "name", label: "名称" },
+  { key: "industry", label: "板块" },
   { key: "close0", label: "信号日价", num: true },
   { key: "price_now", label: "现价", num: true },
   { key: "ret_now", label: "至今", num: true },
@@ -461,6 +463,16 @@ function PoolRow({ r, count, floatMcap, watched, onToggle, showT10 }: { r: Timin
       <td className="py-1.5 pr-2 text-xs">
         {r.name}
         {r.is_st && <span className="ml-1 rounded bg-red-500/20 px-1 text-[9px] font-medium text-red-400">ST</span>}
+      </td>
+      <td className="py-1.5 pr-2">
+        {r.industry ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="text-[11px] text-foreground/70">{r.industry.replace(/^[A-Z]\d+/g, "")}</span>
+            {r.same_ind_n != null && r.same_ind_n >= 2 && (
+              <span className="rounded bg-primary/15 px-1 text-[10px] font-medium text-primary" title={`同日同板块 ${r.same_ind_n} 只被本战法命中`}>同板×{r.same_ind_n}</span>
+            )}
+          </span>
+        ) : <span className="text-muted-foreground/40">—</span>}
       </td>
       <td className="py-1.5 pr-2 text-right font-mono text-xs">{r.close0 != null ? r.close0.toFixed(2) : "—"}</td>
       {showT10 ? (
