@@ -45,11 +45,16 @@ function RecTable({ data }: { data: TimingData }) {
         <span className="text-sm font-semibold">本月推荐 · {data.regime.stage}阶段战法排序</span>
         <Caliber text={
           "按【当前阶段胜率】(十年该阶段全部信号) ×【近3月已结算胜率】综合打分, 当前阶段胜率权重1、近3月权重0.5。\n" +
-          "灯号: 优先=当前阶段≥50%且近3月已结算≥50%; 禁用=当前阶段<45%; 观望=中间; 样本不足=当前阶段或近3月样本<5个。\n" +
+          "灯号(2026-09-26 R2修订): 优先=当前阶段胜率≥50% 且 近3月已结算≥50% 且 当前阶段税后均收益>0 且 阶段胜率超额随机入场基线≥3pct——胜率够但edge在噪声内(期望≈0/跑不赢无脑买)不给'优先'。禁用=当前阶段<45%; 观望=中间; 样本不足=当前阶段或近3月样本<5个。\n" +
           "去重机会=近3月该战法覆盖的不同个股数(同一只票多信号计1次)。\n" +
-          "胜率均为税前口径(往返成本约0.2%见页面底部)。"
+          "胜率均为税前口径(往返成本约0.2%见页面底部); 随机基线为全阶段混合抽样, 作alpha粗筛。"
         } />
-        {rec.all_below_half && (
+        {rec.no_prefer && (
+          <span className="rounded-md bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-400">
+            当前阶段无可信赖战法（胜率够但期望值在噪声内）→ 建议降仓/空仓
+          </span>
+        )}
+        {!rec.no_prefer && rec.all_below_half && (
           <span className="rounded-md bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-400">
             当前阶段全部战法胜率 &lt;50% → 建议降仓/空仓
           </span>
@@ -83,6 +88,12 @@ function RecTable({ data }: { data: TimingData }) {
                       </span>
                     )}
                     <span className="ml-1 text-[10px] text-muted-foreground/60">n={r.stage_n ?? 0}</span>
+                    {r.excess_vs_random != null && (
+                      <div className="text-[10px] text-muted-foreground/70">
+                        超额{r.excess_vs_random >= 0 ? "+" : ""}{(r.excess_vs_random * 100).toFixed(1)}pct
+                        {r.stage_avg_net != null && <> · 净{r.stage_avg_net >= 0 ? "+" : ""}{(r.stage_avg_net * 100).toFixed(2)}%</>}
+                      </div>
+                    )}
                   </td>
                   <td className="py-1.5 pr-2 text-right font-mono text-xs">
                     {r.settled3_win == null ? <span className="text-muted-foreground/50">—</span> :
@@ -355,7 +366,7 @@ export function TimingOverview() {
           "日线: 开盘=前日均收益 收盘=当日 上/下影=当日最好/最差单信号, 柱=覆盖信号数(该日处于10日持仓窗口内的信号)。\n" +
           "最后一根K线灰色半透明=该周期未走完(信号不全), 仅供参考。\n" +
           "成本口径: 全部胜率/收益为【税前】; 税后=税前-往返约0.2%(佣金万2.5双边+印花税0.05%卖出+滑点0.1%), 单战法页可切换。\n" +
-          "幸存者偏差: K线仓库含3只退市股(000004/002731/301139, 占0.06%), 胜率口径已含, 影响可忽略(2026-09-24审计)。\n" +
+          "幸存者偏差(2026-09-26复核): K线仓库≈当前存活股, 乐视网/康得新等2019-2026百家退市股均不在样本(仅3只残留) → 历史胜率系统性偏高, 真实胜率应低于显示值, 超跌类战法偏差最大。\n" +
           "剔除688: 统计与信号池同时排除科创板(流动性差)。\n" +
           "红涨绿跌(A股)。数据=十年本地仓库回测, 自动刷新: K线每日16:35 / 战法周一9:00, 也可右上角手动刷新。"
         } />}

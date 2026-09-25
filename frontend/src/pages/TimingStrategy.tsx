@@ -106,7 +106,7 @@ function AlphaCard({ baseline, randomBaseline }: { baseline: TimingStrategy["bas
         超额胜率 · 均收益 {exAvg >= 0 ? "+" : ""}{exAvg.toFixed(2)}%
       </div>
       <div className="mt-1 text-[9px] leading-tight text-muted-foreground/70">
-        随机买入 胜率{(randomBaseline.win * 100).toFixed(0)}% / 均{(randomBaseline.avg * 100).toFixed(2)}%
+        随机买入 胜率{(randomBaseline.win * 100).toFixed(0)}% / 均{(randomBaseline.avg * 100).toFixed(2)}%（全阶段混合抽样，alpha 粗筛）
       </div>
     </GlassCard>
   );
@@ -421,6 +421,7 @@ function MonthPool({ strat }: { strat: TimingStrategy }) {
         <div>
           <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
             <span className="h-2 w-2 rounded-full bg-emerald-500/70" /> T+10 已结算（持有期满，真实战绩）
+            <span className="text-[10px] font-normal text-muted-foreground/60">结算状态每周一更新，周中新满10日的信号暂留在持有中区</span>
           </div>
           {renderTable(SETTLED_COLS, settledShown, sKey, sDesc, "s", true)}
           {settled.length > limit && (
@@ -585,7 +586,7 @@ export function TimingStrategyPage() {
           "持有期衰减: T5/T10/T20 三持有期的胜率与均收益, 看收益集中在哪段。\n" +
           "阶段适配: 六个市场阶段下该战法的T10胜率/样本量/均收益(税前), 橙色=最强阶段(样本≥30); 样本<30灰条标\"样本不足\"; 带下划线=当前阶段。\n" +
           "本月信号池: 分【T+10已结算】(真实战绩, 含税后列)与【持有中】(未结算·参考, 显示已持天数D N); 同股去重×N=当月信号次数; 默认过滤难买(换手<1%/ST/北交所)。\n" +
-          "幸存者偏差: K线仓库含3只退市股(0.06%), 影响可忽略(2026-09-24审计)。\n" +
+          "幸存者偏差(2026-09-26复核): K线仓库≈当前存活股, 2019-2026百家退市股不在样本(仅3只残留) → 历史胜率系统性偏高, 真实胜率应低于显示值, 超跌类偏差最大。\n" +
           "红涨绿跌(A股)。"
         } />}
       />

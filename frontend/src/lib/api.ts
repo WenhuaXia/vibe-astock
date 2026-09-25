@@ -248,6 +248,8 @@ export interface TimingSignal {
 export interface TimingRecRow {
   sig: string; name: string; group: string;
   stage_win: number | null; stage_n: number | null;      // 当前阶段胜率/样本
+  stage_avg_net: number | null;                           // 当前阶段税后均收益
+  excess_vs_random: number | null;                        // 当前阶段胜率超额随机基线
   settled3_win: number | null; settled3_n: number | null; // 近3月已结算胜率/样本
   opp3: number; n_recent: number;
   score: number | null;
@@ -277,7 +279,7 @@ export interface TimingData {
   stage_month: Record<string, string>;                             // 逐月市场阶段(色带用)
   random_baseline: TimingStat | null;                              // 随机入场T10基准(48%胜率=无脑买入线)
   cost: { round_trip: number; note: string };
-  recommendation: { rows: TimingRecRow[]; top: string[]; all_below_half: boolean };
+  recommendation: { rows: TimingRecRow[]; top: string[]; no_prefer: boolean; all_below_half: boolean };
   survivorship: { kline_codes: number; delisted_in_warehouse: number; note: string };
   strategies: Record<string, TimingStrategy>;
 }
