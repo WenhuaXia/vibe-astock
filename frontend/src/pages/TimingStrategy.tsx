@@ -584,6 +584,22 @@ export function TimingStrategyPage() {
         </div>
       )}
 
+      {strat.board_open && strat.baseline && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+          <span className="font-semibold text-amber-400">⚠ 打板口径对照（封板票尾盘常买不到）</span>
+          <span className="text-muted-foreground">
+            收盘买入回测 <b className="text-foreground">{(strat.baseline.win * 100).toFixed(1)}% / 均{(strat.baseline.avg * 100).toFixed(2)}%</b>
+          </span>
+          <span className="text-muted-foreground">
+            次日开盘真实入场 <b className={cn(strat.board_open.avg < 0 ? "text-red-400" : "text-emerald-400")}>{(strat.board_open.win * 100).toFixed(1)}% / 均{(strat.board_open.avg * 100).toFixed(2)}%</b>
+          </span>
+          <span className="text-muted-foreground/70">
+            口径差 胜率 {(strat.baseline.win - strat.board_open.win > 0 ? "+" : "") + ((strat.baseline.win - strat.board_open.win) * 100).toFixed(1)}pct
+            ——上方各卡仍按收盘口径, 实盘按次日开盘更可信
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <GlassCard className="relative py-3 text-center">
           <button onClick={() => setNet(v => !v)} title="税前/税后切换"

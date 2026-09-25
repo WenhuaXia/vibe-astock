@@ -263,6 +263,7 @@ export interface TimingStrategy {
   hold_curve: Record<"T5" | "T10" | "T20", TimingStat | null>;     // 持有期衰减
   expected: TimingExpected | null;                                 // 期望画像(盈亏比/分位/连亏月)
   mae: TimingMae | null;                                           // 持有期最大不利波动(错了亏多少)
+  board_open: TimingStat | null;                                   // 打板组: 次日开盘价入场口径(对照收盘买入失真)
   month: string;
   recent: TimingSignal[]; // 本月全量信号
 }
