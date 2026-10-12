@@ -26,6 +26,7 @@ export const HOME_FEATURE_GROUPS = [
     { to: "/debate", title: "多空辩论", detail: "同一份数据正反立论，寻找盲点（A 股）" },
     { to: "/backtest", title: "回测", detail: "验证历史表现与策略假设" },
     { to: "/candidates", title: "候选池", detail: "按你设的条件逐只核对，不排名" },
+    { to: "/timing", title: "择时 · 战法胜率", detail: "11 个战法的十年胜率 K 线，按阶段看适配" },
   ] },
   { title: "我的股票", detail: "自选、持仓和它们的事件", features: [
     { to: "/my-stocks", title: "自选与持仓", detail: "自选总览、持仓台账与收益" },

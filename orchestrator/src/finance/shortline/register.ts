@@ -12,6 +12,7 @@ import { shortlineVerify, shortlineVerifyAct } from "./verification.ts";
 import { shortlineWatchAct, shortlineWatchAlerts } from "./watch.ts";
 import { shortlineWeekly } from "./weekly.ts";
 import { shortlineWeeklyReview, shortlineWeeklyReviewAct } from "./weekly_review.ts";
+import { timingStatusRun, timingViewAct, timingViewRun } from "./timing.ts";
 
 registerView({ id: "shortline_history", label: "情绪历史", run: shortlineHistory });
 registerView({ id: "shortline_verify", label: "明日验证", run: shortlineVerify, act: shortlineVerifyAct });
@@ -22,3 +23,6 @@ registerView({ id: "shortline_weekly", label: "近 5 天热度与龙头谱系", 
 registerView({ id: "shortline_weekly_review", label: "AI 周报", run: shortlineWeeklyReview, act: shortlineWeeklyReviewAct });
 registerView({ id: "shortline_intraday", label: "竞价与盘中路径", run: shortlineIntraday, act: (ctx, body, signal) => shortlineIntradayAct(ctx, body, signal) });
 registerView({ id: "shortline_watch", label: "盯盘 · 实时动态", run: shortlineWatchAlerts, act: (ctx, body, signal) => shortlineWatchAct(ctx, body, signal) });
+// 择时(战法胜率动态):数据离线预生成,run 只读 JSON;act 触发后台重跑离线链
+registerView({ id: "shortline_timing", label: "择时 · 战法胜率", run: timingViewRun, act: timingViewAct });
+registerView({ id: "shortline_timing_status", label: "择时 · 刷新进度", run: timingStatusRun });

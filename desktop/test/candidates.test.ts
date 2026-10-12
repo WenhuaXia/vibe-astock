@@ -70,7 +70,7 @@ test("页面:不排名、不给建议、缺数据单独列出、条件只存在�
   assert.doesNotMatch(src, /目标价|评级|买入|卖出|推荐|得分|排行/);
   assert.match(src, /to=\{`\/research\?symbol=\$\{encodeURIComponent\(r\.symbol\)\}`\}/);
   // 10-09 Simon：候选池放研究工具最后一个
-  assert.match(read("lib/nav.ts"), /\{ to: "\/backtest", label: "回测", icon: "FlaskConical" \},\n    \{ to: "\/candidates", label: "候选池", icon: "ListFilter" \},\n  \] \}/);
+  assert.match(read("lib/nav.ts"), /\{ to: "\/backtest", label: "回测", icon: "FlaskConical" \},\n    \{ to: "\/candidates", label: "候选池", icon: "ListFilter" \},\n    \{ to: "\/timing", label: "择时 · 战法胜率", icon: "Thermometer" \},\n  \] \}/);
   assert.match(src, /watch: \{ to: "\/my-stocks\?tab=watch", label: "自选股" \}, position: \{ to: "\/my-stocks\?tab=hold", label: "我的持仓" \}/);
   assert.match(read("lib/homeFeatures.ts"), /to: "\/candidates", title: "候选池"/);
 });

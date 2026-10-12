@@ -57,6 +57,7 @@ export const NAV_SECTIONS: NavSection[] = [
     { to: "/debate", label: "多空辩论", icon: "Swords" },
     { to: "/backtest", label: "回测", icon: "FlaskConical" },
     { to: "/candidates", label: "候选池", icon: "ListFilter" },
+    { to: "/timing", label: "择时 · 战法胜率", icon: "Thermometer" },
   ] },
   { label: "我的股票", icon: "Star", pages: [
     { to: "/my-stocks", label: "自选与持仓", icon: "Wallet" },

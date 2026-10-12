@@ -26,6 +26,9 @@ export const router = createBrowserRouter([
       { path: "/journal", lazy: async () => ({ Component: (await import("@/pages/Journal")).Journal }) },
       { path: "/journal/:tab", lazy: async () => ({ Component: (await import("@/pages/Journal")).Journal }) },
       { path: "/daily-review", lazy: async () => ({ Component: (await import("@/pages/DailyReview")).DailyReview }) },
+      // 择时(战法胜率动态):从 v1 移植,数据离线预生成,总览 + 单战法两屏
+      { path: "/timing", lazy: async () => ({ Component: (await import("@/shortline/timing/TimingOverview")).TimingOverview }) },
+      { path: "/timing/:sig", lazy: async () => ({ Component: (await import("@/shortline/timing/TimingStrategy")).TimingStrategyPage }) },
       { path: "/intel", lazy: async () => ({ Component: (await import("@/pages/Intel")).Intel }) },
       { path: "/intel/:tab", lazy: async () => ({ Component: (await import("@/pages/Intel")).Intel }) },
       { path: "/signals", lazy: async () => ({ Component: (await import("@/pages/Signals")).Signals }) },

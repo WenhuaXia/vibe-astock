@@ -170,7 +170,7 @@ test("个股深挖只有一个入口、多空辩论是研究工具下单独一�
   assert.match(routerSrc, /path:\s*"\/debate"\s*,\s*lazy:/);
   assert.doesNotMatch(routerSrc, /<Moved\s+to="\/research"\s+tab="debate"/);
   const tools = NAV_SECTIONS.find((s) => s.label === "研究工具");
-  assert.deepEqual(tools?.pages.map((p) => [p.to, p.label]), [["/research", "个股深挖"], ["/debate", "多空辩论"], ["/backtest", "回测"], ["/candidates", "候选池"]]);
+  assert.deepEqual(tools?.pages.map((p) => [p.to, p.label]), [["/research", "个股深挖"], ["/debate", "多空辩论"], ["/backtest", "回测"], ["/candidates", "候选池"], ["/timing", "择时 · 战法胜率"]]);
   assert.equal(NAV_SECTIONS.flatMap((s) => s.pages).filter((p) => p.to === "/research").length, 1, "个股深挖在侧栏里只有一个入口");
   const labels = NAV_SECTIONS.flatMap((s) => [s.label, ...s.pages.map((p) => p.label)]);
   assert.ok(!labels.includes("深度研究"), "深度研究是个股深挖的分页,不占侧栏");
